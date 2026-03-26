@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Equipos</h1>
+
+<div style="display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
+  {% if current_user.role in ['admin', 'technician'] %}
+  <div>
+    <a class="btn" href="{{ url_for('equipment_new') }}">Nuevo equipo</a>
+  </div>
+  {% endif %}
+
+  <form method="get" style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;">
+    <div>
+      <label for="category">Categoría</label>
+      <select name="category" id="category">
+        <option value="">Todas</option>
+        {% for value, label in categories %}
+          <option value="{{ value }}" {% if category_filter == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label for="status">Estado</label>
+      <select name="status" id="status">
+        <option value="">Todos</option>
+        {% for value, label in statuses %}
+          <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="display:flex;gap:8px;">
+      <button type="submit" class="btn">Filtrar</button>
+      <a class="btn btn-secondary" href="{{ url_for('equipment_list') }}">Limpiar</a>
+    </div>
+  </form>
+</div>
+
+{% if equipment %}
+<table>
+  <thead>
+    <tr>
+      <th>Nombre</th>
+      <th>Inventario</th>
+      <th>Categoría</th>
+      <th>Ubicación</th>
+      <th>Estado</th>
+      <th>Criticidad</th>
+      {% if current_user.role in ['admin', 'technician'] %}
+      <th>Acciones</th>
+      {% endif %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in equipment %}
+    <tr>
+      <td>{{ item.name }}</td>
+      <td>{{ item.asset_tag }}</td>
+      <td>{{ label_from_choice(item.category, categories) }}</td>
+      <td>{{ label_from_choice(item.location, locations) }}</td>
+      <td>{{ label_from_choice(item.status, statuses) }}</td>
+      <td>{{ label_from_choice(item.criticality, criticalities) }}</td>
+      {% if current_user.role in ['admin', 'technician'] %}
+      <td>
+        <a class="btn btn-secondary" href="{{ url_for('equipment_edit', equipment_id=item.id) }}">Editar</a>
+        {% if current_user.role == 'admin' %}
+        <form method="post" action="{{ url_for('equipment_delete', equipment_id=item.id) }}" class="inline" onsubmit="return confirm('¿Seguro que quieres eliminar este equipo?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-danger">Eliminar</button>
+        </form>
+        {% endif %}
+      </td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No hay equipos registrados.</p>
+{% endif %}
+{% endblock %}

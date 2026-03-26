@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Acceso a LabGuard</h1>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <label>{{ form.email.label }}</label>
+  {{ form.email() }}
+  {% for error in form.email.errors %}<div class="flash danger">{{ error }}</div>{% endfor %}
+
+  <label>{{ form.password.label }}</label>
+  {{ form.password() }}
+  {% for error in form.password.errors %}<div class="flash danger">{{ error }}</div>{% endfor %}
+
+  {{ form.submit(class_='btn') }}
+</form>
+<p class="muted">Usuario inicial: admin@labguard.com / ChangeMe!123</p>
+{% endblock %}

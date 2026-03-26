@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Incidencias</h1>
+<p><a class="btn" href="{{ url_for('incident_new') }}">Nueva incidencia</a></p>
+<table>
+  <tr><th>ID</th><th>Título</th><th>Equipo</th><th>Severidad</th><th>Estado</th><th>Reporta</th><th>Respuesta técnica</th><th>Acciones</th></tr>
+  {% for incident in incidents %}
+    <tr>
+      <td>{{ incident.id }}</td>
+      <td>{{ incident.title }}<br><span class="muted">{{ incident.description }}</span></td>
+      <td>{{ incident.equipment.name if incident.equipment else '-' }}</td>
+      <td>{{ incident.severity }}</td>
+      <td>{{ incident.status }}</td>
+      <td>{{ incident.reporter.email }}</td>
+      <td>
+        {% if incident.technical_response %}
+          {{ incident.technical_response }}<br>
+          <span class="muted">Por {{ incident.responded_by_email }} el {{ incident.responded_at }}</span>
+        {% else %}
+          -
+        {% endif %}
+      </td>
+      <td>
+        {% if current_user.role in ['admin', 'technician'] and incident.status in ['open', 'answered'] %}
+          {% if incident.status == 'open' %}
+            <form method="post" action="{{ url_for('incident_respond', incident_id=incident.id) }}">
+              {{ response_form.hidden_tag() }}
+              {{ response_form.response(placeholder='Respuesta del técnico o administrador') }}
+              <button type="submit">Responder</button>
+            </form>
+          {% endif %}
+          <form class="inline" method="post" action="{{ url_for('incident_close', incident_id=incident.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button>Cerrar</button></form>
+        {% else %}
+          -
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+</table>
+{% endblock %}

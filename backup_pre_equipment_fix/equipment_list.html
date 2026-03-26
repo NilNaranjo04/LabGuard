@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Equipos</h1>
+{% if current_user.role in ['admin', 'technician'] %}
+  <p><a class="btn" href="{{ url_for('equipment_new') }}">Nuevo equipo</a></p>
+{% endif %}
+
+<form method="get" class="grid" style="margin-bottom:16px; align-items:end;">
+  <div>
+    <label>Categoría</label>
+    <select name="category">
+      <option value="">Todas</option>
+      {% for value, label in categories %}
+        <option value="{{ value }}" {% if category_filter == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label>Estado</label>
+    <select name="status">
+      <option value="">Todos</option>
+      {% for value, label in statuses %}
+        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <button type="submit">Filtrar</button>
+    <a class="btn btn-secondary" href="{{ url_for('equipment_list') }}">Limpiar</a>
+  </div>
+</form>
+
+<table>
+  <tr><th>Nombre</th><th>Inventario</th><th>Categoría</th><th>Ubicación</th><th>Estado</th><th>Criticidad</th></tr>
+  {% for item in equipment %}
+    <tr>
+      <td>{{ item.name }}</td>
+      <td>{{ item.asset_tag }}</td>
+      <td>{{ label_from_choice(item.category, categories) }}</td>
+      <td>{{ item.location }}</td>
+      <td>{{ item.status }}</td>
+      <td>{{ item.criticality }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6">No hay equipos con los filtros seleccionados.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

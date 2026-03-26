@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Alta de equipo</h1>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <label>{{ form.name.label }}</label>
+  {{ form.name() }}
+  {% for error in form.name.errors %}<div class="flash danger">{{ error }}</div>{% endfor %}
+
+  <label>Código inventario</label>
+  <input type="text" value="{{ suggested_asset_tag }}" readonly>
+  <p class="muted">Se genera automáticamente al guardar el equipo.</p>
+
+  <label>{{ form.category.label }}</label>
+  {{ form.category() }}
+  {% for error in form.category.errors %}<div class="flash danger">{{ error }}</div>{% endfor %}
+
+  <label>{{ form.location.label }}</label>
+  {{ form.location() }}
+  {% for error in form.location.errors %}<div class="flash danger">{{ error }}</div>{% endfor %}
+
+  <label>{{ form.status.label }}</label>
+  {{ form.status() }}
+  {% for error in form.status.errors %}<div class="flash danger">{{ error }}</div>{% endfor %}
+
+  <label>{{ form.criticality.label }}</label>
+  {{ form.criticality() }}
+  {% for error in form.criticality.errors %}<div class="flash danger">{{ error }}</div>{% endfor %}
+
+  <label>{{ form.notes.label }}</label>
+  {{ form.notes() }}
+
+  {{ form.submit(class_='btn') }}
+</form>
+{% endblock %}

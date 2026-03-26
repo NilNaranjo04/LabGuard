@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Préstamos</h1>
+{% if current_user.role in ['admin', 'user'] %}
+<p><a class="btn" href="{{ url_for('loan_new') }}">Solicitar préstamo</a></p>
+{% endif %}
+<table>
+  <tr><th>ID</th><th>Solicitante</th><th>Equipo</th><th>Finalidad</th><th>Estado</th><th>Acciones</th></tr>
+  {% for loan in loans %}
+    <tr>
+      <td>{{ loan.id }}</td>
+      <td>{{ loan.requester.email }}</td>
+      <td>{{ loan.equipment.name }} ({{ loan.equipment.asset_tag }})</td>
+      <td>
+        {{ loan.purpose }}
+        {% if loan.rejection_reason %}<br><span class="muted">Motivo rechazo: {{ loan.rejection_reason }}</span>{% endif %}
+      </td>
+      <td>{{ loan.status }}</td>
+      <td>
+        {% if current_user.role == 'admin' %}
+          {% if loan.status == 'requested' %}
+            <form class="inline" method="post" action="{{ url_for('loan_action', loan_id=loan.id, action='approve') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button>Aprobar</button></form>
+            <form class="inline" method="post" action="{{ url_for('loan_action', loan_id=loan.id, action='reject') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button>Rechazar</button></form>
+          {% elif loan.status == 'returned' %}
+            <form class="inline" method="post" action="{{ url_for('loan_action', loan_id=loan.id, action='close') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button>Cerrar</button></form>
+          {% else %}
+            -
+          {% endif %}
+        {% elif current_user.role == 'technician' %}
+          {% if loan.status == 'approved' %}
+            <form class="inline" method="post" action="{{ url_for('loan_action', loan_id=loan.id, action='deliver') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button>Entregar</button></form>
+          {% elif loan.status == 'delivered' %}
+            <form class="inline" method="post" action="{{ url_for('loan_action', loan_id=loan.id, action='return') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button>Registrar devolución</button></form>
+          {% else %}
+            -
+          {% endif %}
+        {% else %}
+          -
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+</table>
+{% endblock %}

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LabGuard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #f4f6f8; color: #1f2937; }
+    nav { background: #0f172a; color: white; padding: 14px 24px; }
+    nav a { color: white; margin-right: 16px; text-decoration: none; }
+    .container { max-width: 1100px; margin: 24px auto; background: white; padding: 24px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    .flash { padding: 10px 12px; border-radius: 6px; margin-bottom: 10px; }
+    .success { background: #dcfce7; }
+    .danger { background: #fee2e2; }
+    .warning { background: #fef3c7; }
+    .info { background: #dbeafe; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #e5e7eb; padding: 10px; text-align: left; vertical-align: top; }
+    input, select, textarea { width: 100%; padding: 10px; margin-top: 6px; margin-bottom: 14px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+    button, .btn { background: #0f172a; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; }
+    .btn-secondary { background: #475569; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: 10px; }
+    .muted { color: #64748b; }
+    .inline { display: inline; }
+  </style>
+</head>
+<body>
+  <nav>
+    {% if current_user.is_authenticated %}
+      <a href="{{ url_for('dashboard') }}">Dashboard</a>
+      <a href="{{ url_for('equipment_list') }}">Equipos</a>
+      <a href="{{ url_for('loans_list') }}">Préstamos</a>
+      <a href="{{ url_for('incidents_list') }}">Incidencias</a>
+      {% if current_user.role == 'admin' %}
+        <a href="{{ url_for('create_user') }}">Usuarios</a>
+        <a href="{{ url_for('audit_list') }}">Auditoría</a>
+      {% endif %}
+      <span class="muted"> | {{ current_user.email }} ({{ current_user.role }})</span>
+      <a href="{{ url_for('logout') }}" style="float:right">Salir</a>
+    {% else %}
+      <strong>LabGuard</strong>
+    {% endif %}
+  </nav>
+
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

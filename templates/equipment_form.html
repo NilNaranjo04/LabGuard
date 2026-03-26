@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>{{ form_title }}</h1>
+
+<form method="post">
+  {{ form.hidden_tag() }}
+
+  <label for="asset_tag_preview">Código de inventario</label>
+  <input type="text" id="asset_tag_preview" value="{{ suggested_asset_tag }}" {% if read_only_asset_tag %}readonly{% endif %}>
+
+  <label>{{ form.name.label }}</label>
+  {{ form.name() }}
+  {% for error in form.name.errors %}
+    <div class="flash danger">{{ error }}</div>
+  {% endfor %}
+
+  <label>{{ form.category.label }}</label>
+  {{ form.category() }}
+  {% for error in form.category.errors %}
+    <div class="flash danger">{{ error }}</div>
+  {% endfor %}
+
+  <label>{{ form.location.label }}</label>
+  {{ form.location() }}
+  {% for error in form.location.errors %}
+    <div class="flash danger">{{ error }}</div>
+  {% endfor %}
+
+  <label>{{ form.status.label }}</label>
+  {{ form.status() }}
+  {% for error in form.status.errors %}
+    <div class="flash danger">{{ error }}</div>
+  {% endfor %}
+
+  <label>{{ form.criticality.label }}</label>
+  {{ form.criticality() }}
+  {% for error in form.criticality.errors %}
+    <div class="flash danger">{{ error }}</div>
+  {% endfor %}
+
+  <label>{{ form.notes.label }}</label>
+  {{ form.notes() }}
+  {% for error in form.notes.errors %}
+    <div class="flash danger">{{ error }}</div>
+  {% endfor %}
+
+  {{ form.submit(class_='btn', value=submit_label) }}
+  <a class="btn btn-secondary" href="{{ url_for('equipment_list') }}">Volver</a>
+</form>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Dashboard</h1>
+<div class="grid">
+  <div class="card"><strong>Usuarios</strong><br>{{ stats.users }}</div>
+  <div class="card"><strong>Equipos</strong><br>{{ stats.equipment }}</div>
+  <div class="card"><strong>Préstamos abiertos</strong><br>{{ stats.loans_open }}</div>
+  <div class="card"><strong>Incidencias abiertas</strong><br>{{ stats.incidents_open }}</div>
+</div>
+{% endblock %}
