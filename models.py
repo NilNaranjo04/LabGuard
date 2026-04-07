@@ -13,6 +13,8 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), nullable=False, default="user")
     active = db.Column(db.Boolean, nullable=False, default=True)
+    must_change_password = db.Column(db.Boolean, nullable=False, default=False)
+    approval_status = db.Column(db.String(20), nullable=False, default="approved")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     loans = db.relationship("Loan", back_populates="requester", foreign_keys="Loan.requester_id")
@@ -45,6 +47,8 @@ class Loan(db.Model):
     requester_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     equipment_id = db.Column(db.Integer, db.ForeignKey("equipment.id"), nullable=False)
     purpose = db.Column(db.String(255), nullable=False)
+    requested_days = db.Column(db.Integer, nullable=False, default=1)
+    due_at = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), nullable=False, default="requested")
     rejection_reason = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

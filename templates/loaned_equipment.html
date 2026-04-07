@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Equipos prestados</h1>
+
+{% if active_loans %}
+<table>
+  <thead>
+    <tr>
+      <th>Equipo</th>
+      <th>Inventario</th>
+      <th>Usuario</th>
+      <th>Días solicitados</th>
+      <th>Fecha de solicitud</th>
+      <th>Fecha límite</th>
+      <th>Estado</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for loan in active_loans %}
+    <tr>
+      <td>{{ loan.equipment.name }}</td>
+      <td>{{ loan.equipment.asset_tag }}</td>
+      <td>{{ loan.requester.name }}</td>
+      <td>{{ loan.requested_days }}</td>
+      <td>{{ loan.created_at.strftime('%Y-%m-%d %H:%M') if loan.created_at else '' }}</td>
+      <td>
+        {{ loan.due_at.strftime('%Y-%m-%d %H:%M') if loan.due_at else '-' }}
+        {% if loan.due_at and loan.due_at < now %}
+          <br><span class="flash danger" style="display:inline-block;padding:4px 8px;">Fuera de plazo</span>
+        {% endif %}
+      </td>
+      <td>{{ loan.status }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No hay equipos entregados actualmente.</p>
+{% endif %}
+{% endblock %}

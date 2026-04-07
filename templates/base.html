@@ -31,13 +31,16 @@
     {% if current_user.is_authenticated %}
       <a href="{{ url_for('dashboard') }}">Dashboard</a>
       <a href="{{ url_for('equipment_list') }}">Equipos</a>
+      {% if current_user.role == 'admin' %}
+        <a href="{{ url_for('loaned_equipment') }}">Equipos prestados</a>
+      {% endif %}
       <a href="{{ url_for('loans_list') }}">Préstamos</a>
       <a href="{{ url_for('incidents_list') }}">Incidencias</a>
       {% if current_user.role == 'admin' %}
         <a href="{{ url_for('users_list') }}">Usuarios</a>
         <a href="{{ url_for('audit_list') }}">Auditoría</a>
       {% endif %}
-      <span class="muted"> | {{ current_user.email }} ({{ current_user.role }})</span>
+      <a href="{{ url_for('account') }}">Mi cuenta</a>
       <a href="{{ url_for('logout') }}" style="float:right">Salir</a>
     {% else %}
       <strong>LabGuard</strong>

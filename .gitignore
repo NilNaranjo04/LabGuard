@@ -1,37 +1,6 @@
-# Python
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-
-# Entornos virtuales
-.venv/
-venv/
-env/
-
-# Variables sensibles
+instance/
 .env
-
-# Base de datos
-instance/*.db
-*.sqlite3
-
-# Logs
-*.log
-logs/
-evidencias/
-
-# Backups
-backups/
-*.tar.gz
-
-# Sistema
-.DS_Store
-Thumbs.db
-
-# Editor
-.vscode/
-.idea/
-
-# Docker
-*.pid
+certs/
+backup*/

@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Mi cuenta</h1>
+
+<div class="card">
+  <p><strong>Nombre:</strong> {{ current_user.name }}</p>
+  <p><strong>Correo:</strong> {{ current_user.email }}</p>
+  <p><strong>Rol:</strong> {{ current_user.role }}</p>
+  <p><strong>Fecha de alta:</strong> {{ current_user.created_at.strftime('%Y-%m-%d %H:%M') if current_user.created_at else '' }}</p>
+</div>
+
+<p style="margin-top:20px;">
+  <a class="btn" href="{{ url_for('change_password') }}">Cambiar contraseña</a>
+</p>
+{% endblock %}

@@ -1,19 +1,22 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import Flask, flash, redirect, render_template, request, url_for
 from flask_wtf.csrf import CSRFProtect
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
+from sqlalchemy import inspect
 
 from forms import (
     CATEGORY_CHOICES,
+    ChangePasswordForm,
     EditUserForm,
     EquipmentForm,
     IncidentForm,
     IncidentResponseForm,
     LoanForm,
     LoginForm,
+    RegistrationForm,
     UserForm,
 )
 from models import AuditLog, Equipment, Incident, Loan, User, db
@@ -38,9 +41,27 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        ensure_schema()
 
     register_routes(app)
     return app
+
+
+def ensure_schema():
+    inspector = inspect(db.engine)
+
+    user_columns = {col["name"] for col in inspector.get_columns("user")}
+    loan_columns = {col["name"] for col in inspector.get_columns("loan")}
+
+    with db.engine.begin() as conn:
+        if "must_change_password" not in user_columns:
+            conn.exec_driver_sql("ALTER TABLE user ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT 0")
+        if "approval_status" not in user_columns:
+            conn.exec_driver_sql("ALTER TABLE user ADD COLUMN approval_status VARCHAR(20) NOT NULL DEFAULT 'approved'")
+        if "requested_days" not in loan_columns:
+            conn.exec_driver_sql("ALTER TABLE loan ADD COLUMN requested_days INTEGER NOT NULL DEFAULT 1")
+        if "due_at" not in loan_columns:
+            conn.exec_driver_sql("ALTER TABLE loan ADD COLUMN due_at DATETIME")
 
 
 @login_manager.user_loader
@@ -81,25 +102,79 @@ def label_from_choice(value: str, choices) -> str:
 
 
 def register_routes(app):
+    @app.before_request
+    def force_password_change():
+        allowed_endpoints = {"change_password", "logout", "static"}
+        if current_user.is_authenticated and getattr(current_user, "must_change_password", False):
+            if request.endpoint not in allowed_endpoints:
+                flash("Debes cambiar la contraseña antes de continuar.", "warning")
+                return redirect(url_for("change_password"))
+
     @app.route("/")
     def index():
         if current_user.is_authenticated:
             return redirect(url_for("dashboard"))
         return redirect(url_for("login"))
 
+    @app.route("/register", methods=["GET", "POST"])
+    def register():
+        if current_user.is_authenticated:
+            return redirect(url_for("dashboard"))
+
+        form = RegistrationForm()
+        if form.validate_on_submit():
+            email = form.email.data.lower().strip()
+            existing = User.query.filter_by(email=email).first()
+            if existing:
+                flash("Ya existe una cuenta con ese correo.", "danger")
+                return render_template("register.html", form=form)
+
+            user = User(
+                name=form.name.data.strip(),
+                email=email,
+                role="user",
+                active=False,
+                approval_status="pending",
+                must_change_password=False,
+            )
+            user.set_password(form.password.data)
+            db.session.add(user)
+            db.session.commit()
+            audit("public_registration", f"Solicitud de cuenta creada para {email}")
+            flash("Tu solicitud de cuenta se ha enviado. Un administrador debe validarla.", "success")
+            return redirect(url_for("login"))
+
+        return render_template("register.html", form=form)
+
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if current_user.is_authenticated:
             return redirect(url_for("dashboard"))
+
         form = LoginForm()
         if form.validate_on_submit():
-            user = User.query.filter_by(email=form.email.data.lower().strip(), active=True).first()
-            if user and user.check_password(form.password.data):
+            email = form.email.data.lower().strip()
+            user = User.query.filter_by(email=email).first()
+
+            if user and user.approval_status == "pending":
+                flash("Tu cuenta todavía está pendiente de validación por parte del administrador.", "warning")
+                audit("login_pending_user", f"Intento de acceso de cuenta pendiente: {email}")
+                return render_template("login.html", form=form)
+
+            if user and user.approval_status == "rejected":
+                flash("Tu solicitud de cuenta fue rechazada por el administrador.", "danger")
+                audit("login_rejected_user", f"Intento de acceso de cuenta rechazada: {email}")
+                return render_template("login.html", form=form)
+
+            if user and user.active and user.check_password(form.password.data):
                 login_user(user)
                 audit("login_success", f"Inicio de sesión correcto para {user.email}")
                 flash("Sesión iniciada.", "success")
+                if user.must_change_password:
+                    return redirect(url_for("change_password"))
                 return redirect(url_for("dashboard"))
-            audit("login_failure", f"Intento fallido para {form.email.data.lower().strip()}")
+
+            audit("login_failure", f"Intento fallido para {email}")
             flash("Credenciales no válidas.", "danger")
         return render_template("login.html", form=form)
 
@@ -109,6 +184,24 @@ def register_routes(app):
         logout_user()
         flash("Sesión cerrada.", "info")
         return redirect(url_for("login"))
+
+    @app.route("/account")
+    @login_required
+    def account():
+        return render_template("account.html")
+
+    @app.route("/account/change-password", methods=["GET", "POST"])
+    @login_required
+    def change_password():
+        form = ChangePasswordForm()
+        if form.validate_on_submit():
+            current_user.set_password(form.password.data.strip())
+            current_user.must_change_password = False
+            db.session.commit()
+            audit("password_changed", f"Contraseña cambiada por {current_user.email}")
+            flash("Contraseña actualizada correctamente.", "success")
+            return redirect(url_for("dashboard"))
+        return render_template("change_password.html", form=form)
 
     @app.route("/dashboard")
     @login_required
@@ -125,8 +218,9 @@ def register_routes(app):
     @login_required
     @role_required("admin")
     def users_list():
-        users = User.query.order_by(User.created_at.desc()).all()
-        return render_template("users_list.html", users=users)
+        users = User.query.filter(User.approval_status != "pending").order_by(User.created_at.desc()).all()
+        pending_users = User.query.filter_by(approval_status="pending").order_by(User.created_at.desc()).all()
+        return render_template("users_list.html", users=users, pending_users=pending_users)
 
     @app.route("/users/new", methods=["GET", "POST"])
     @login_required
@@ -149,12 +243,15 @@ def register_routes(app):
                 name=form.name.data.strip(),
                 email=email,
                 role=form.role.data,
+                active=True,
+                approval_status="approved",
+                must_change_password=True,
             )
             user.set_password(form.password.data)
             db.session.add(user)
             db.session.commit()
             audit("user_created", f"Usuario creado: {email} ({user.role})")
-            flash("Usuario creado.", "success")
+            flash("Usuario creado. Tendrá que cambiar la contraseña al entrar por primera vez.", "success")
             return redirect(url_for("users_list"))
 
         return render_template(
@@ -164,6 +261,31 @@ def register_routes(app):
             submit_label="Crear usuario",
             password_optional=False,
         )
+
+    @app.route("/users/<int:user_id>/approve", methods=["POST"])
+    @login_required
+    @role_required("admin")
+    def approve_user(user_id):
+        user = User.query.get_or_404(user_id)
+        user.active = True
+        user.approval_status = "approved"
+        user.must_change_password = True
+        db.session.commit()
+        audit("user_approved", f"Cuenta aprobada: {user.email}")
+        flash("Cuenta aprobada correctamente.", "success")
+        return redirect(url_for("users_list"))
+
+    @app.route("/users/<int:user_id>/reject", methods=["POST"])
+    @login_required
+    @role_required("admin")
+    def reject_user(user_id):
+        user = User.query.get_or_404(user_id)
+        user.active = False
+        user.approval_status = "rejected"
+        db.session.commit()
+        audit("user_rejected", f"Cuenta rechazada: {user.email}")
+        flash("Solicitud rechazada.", "info")
+        return redirect(url_for("users_list"))
 
     @app.route("/users/<int:user_id>/edit", methods=["GET", "POST"])
     @login_required
@@ -274,6 +396,13 @@ def register_routes(app):
             criticalities=criticalities,
         )
 
+    @app.route("/equipment/loaned")
+    @login_required
+    @role_required("admin")
+    def loaned_equipment():
+        active_loans = Loan.query.filter_by(status="delivered").order_by(Loan.due_at.asc()).all()
+        return render_template("loaned_equipment.html", active_loans=active_loans, now=datetime.utcnow())
+
     @app.route("/equipment/new", methods=["GET", "POST"])
     @login_required
     @role_required("admin", "technician")
@@ -378,11 +507,16 @@ def register_routes(app):
     @app.route("/loans")
     @login_required
     def loans_list():
-        if current_user.role in ["admin", "technician"]:
+        if current_user.role == "technician":
+            flash("No puedes usar la función de préstamos con el perfil de técnico.", "warning")
+            return redirect(url_for("dashboard"))
+
+        if current_user.role == "admin":
             loans = Loan.query.order_by(Loan.created_at.desc()).all()
         else:
             loans = Loan.query.filter_by(requester_id=current_user.id).order_by(Loan.created_at.desc()).all()
-        return render_template("loan_list.html", loans=loans)
+
+        return render_template("loan_list.html", loans=loans, now=datetime.utcnow())
 
     @app.route("/loans/new", methods=["GET", "POST"])
     @login_required
@@ -402,15 +536,20 @@ def register_routes(app):
                 flash("Ese equipo ya no está disponible.", "danger")
                 return redirect(url_for("loan_new"))
 
+            requested_days = int(form.requested_days.data)
+            due_at = datetime.utcnow() + timedelta(days=requested_days)
+
             loan = Loan(
                 requester_id=current_user.id,
                 equipment_id=equipment.id,
                 purpose=form.purpose.data.strip(),
+                requested_days=requested_days,
+                due_at=due_at,
                 status="requested",
             )
             db.session.add(loan)
             db.session.commit()
-            audit("loan_requested", f"Préstamo solicitado #{loan.id} por {current_user.email}")
+            audit("loan_requested", f"Préstamo solicitado #{loan.id} por {current_user.email} durante {requested_days} días")
             flash("Solicitud enviada.", "success")
             return redirect(url_for("loans_list"))
 
@@ -418,6 +557,7 @@ def register_routes(app):
 
     @app.route("/loans/<int:loan_id>/<string:action>", methods=["POST"])
     @login_required
+    @role_required("admin")
     def loan_action(loan_id, action):
         loan = Loan.query.get_or_404(loan_id)
         equipment = loan.equipment
@@ -425,24 +565,16 @@ def register_routes(app):
         admin_transitions = {
             "approve": ("requested", "approved"),
             "reject": ("requested", "rejected"),
-            "close": ("returned", "closed"),
-        }
-        technician_transitions = {
             "deliver": ("approved", "delivered"),
             "return": ("delivered", "returned"),
+            "close": ("returned", "closed"),
         }
 
-        allowed = {}
-        if current_user.role == "admin":
-            allowed.update(admin_transitions)
-        if current_user.role == "technician":
-            allowed.update(technician_transitions)
-
-        if action not in allowed:
-            flash("No tienes permisos para realizar esta acción.", "danger")
+        if action not in admin_transitions:
+            flash("Acción no válida.", "danger")
             return redirect(url_for("loans_list"))
 
-        expected, new_state = allowed[action]
+        expected, new_state = admin_transitions[action]
         if loan.status != expected:
             flash(f"El préstamo debe estar en estado {expected}.", "danger")
             return redirect(url_for("loans_list"))

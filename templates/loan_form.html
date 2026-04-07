@@ -3,6 +3,7 @@
 <h1>Solicitar préstamo</h1>
 <form method="post">
   {{ form.hidden_tag() }}
+
   <label>{{ form.equipment_id.label }}</label>
   {{ form.equipment_id() }}
   {% for error in form.equipment_id.errors %}<div class="flash danger">{{ error }}</div>{% endfor %}
@@ -10,6 +11,11 @@
   <label>{{ form.purpose.label }}</label>
   {{ form.purpose() }}
   {% for error in form.purpose.errors %}<div class="flash danger">{{ error }}</div>{% endfor %}
+
+  <label>{{ form.requested_days.label }}</label>
+  {{ form.requested_days() }}
+  {% for error in form.requested_days.errors %}<div class="flash danger">{{ error }}</div>{% endfor %}
+  <p class="muted">El máximo permitido es de 30 días.</p>
 
   {{ form.submit(class_='btn') }}
 </form>

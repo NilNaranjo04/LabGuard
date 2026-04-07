@@ -1,10 +1,43 @@
 {% extends 'base.html' %}
 {% block content %}
 <h1>Dashboard</h1>
-<div class="grid">
-  <div class="card"><strong>Usuarios</strong><br>{{ stats.users }}</div>
-  <div class="card"><strong>Equipos</strong><br>{{ stats.equipment }}</div>
-  <div class="card"><strong>Préstamos abiertos</strong><br>{{ stats.loans_open }}</div>
-  <div class="card"><strong>Incidencias abiertas</strong><br>{{ stats.incidents_open }}</div>
-</div>
+
+{% if current_user.role == 'user' %}
+  <div class="grid">
+    <div class="card">
+      <h2>Solicitar préstamo</h2>
+      <p class="muted">Desde aquí podemos pedir un equipo disponible durante el tiempo que necesitemos, con un máximo de 30 días.</p>
+      <a class="btn" href="{{ url_for('loan_new') }}">Ir a préstamos</a>
+    </div>
+
+    <div class="card">
+      <h2>Crear incidencia</h2>
+      <p class="muted">Si detectamos un problema en un equipo o queremos reportar una anomalía, podemos registrar una incidencia.</p>
+      <a class="btn" href="{{ url_for('incident_new') }}">Registrar incidencia</a>
+    </div>
+  </div>
+
+{% else %}
+  <div class="grid">
+    <div class="card">
+      <h2>Usuarios</h2>
+      <p>{{ stats.users }}</p>
+    </div>
+
+    <div class="card">
+      <h2>Equipos</h2>
+      <p>{{ stats.equipment }}</p>
+    </div>
+
+    <div class="card">
+      <h2>Préstamos abiertos</h2>
+      <p>{{ stats.loans_open }}</p>
+    </div>
+
+    <div class="card">
+      <h2>Incidencias abiertas</h2>
+      <p>{{ stats.incidents_open }}</p>
+    </div>
+  </div>
+{% endif %}
 {% endblock %}
