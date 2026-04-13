@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Verificación 2FA</h1>
+
+<p>Introduce el código de 6 dígitos de tu aplicación autenticadora.</p>
+
+<form method="post">
+  {{ form.hidden_tag() }}
+
+  <label>{{ form.token.label }}</label>
+  {{ form.token() }}
+  {% for error in form.token.errors %}
+    <div class="flash danger">{{ error }}</div>
+  {% endfor %}
+
+  {{ form.submit(class_='btn') }}
+</form>
+{% endblock %}

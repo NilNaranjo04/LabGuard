@@ -20,6 +20,8 @@ class User(UserMixin, db.Model):
     captcha_failed_attempts = db.Column(db.Integer, nullable=False, default=0)
     is_banned = db.Column(db.Boolean, nullable=False, default=False)
     pending_admin_review = db.Column(db.Boolean, nullable=False, default=False)
+    two_factor_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    two_factor_secret = db.Column(db.String(64), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     loans = db.relationship("Loan", back_populates="requester", foreign_keys="Loan.requester_id")

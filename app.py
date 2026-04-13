@@ -1,8 +1,12 @@
+import base64
+import io
 import os
 import random
 from datetime import datetime, timedelta
 from functools import wraps
 
+import pyotp
+import qrcode
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 from flask_wtf.csrf import CSRFProtect
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
@@ -22,6 +26,8 @@ from forms import (
     ResetPasswordWithQuestionForm,
     SecurityQuestionForm,
     SECURITY_QUESTION_CHOICES,
+    TwoFactorLoginForm,
+    TwoFactorSetupForm,
     UserForm,
 )
 from models import AuditLog, Equipment, Incident, Loan, User, db
@@ -75,6 +81,10 @@ def ensure_schema():
             conn.exec_driver_sql("ALTER TABLE user ADD COLUMN is_banned BOOLEAN NOT NULL DEFAULT 0")
         if "pending_admin_review" not in user_columns:
             conn.exec_driver_sql("ALTER TABLE user ADD COLUMN pending_admin_review BOOLEAN NOT NULL DEFAULT 0")
+        if "two_factor_enabled" not in user_columns:
+            conn.exec_driver_sql("ALTER TABLE user ADD COLUMN two_factor_enabled BOOLEAN NOT NULL DEFAULT 0")
+        if "two_factor_secret" not in user_columns:
+            conn.exec_driver_sql("ALTER TABLE user ADD COLUMN two_factor_secret VARCHAR(64)")
         if "requested_days" not in loan_columns:
             conn.exec_driver_sql("ALTER TABLE loan ADD COLUMN requested_days INTEGER NOT NULL DEFAULT 1")
         if "due_at" not in loan_columns:
@@ -98,9 +108,7 @@ def role_required(*allowed_roles):
                 flash("No tienes permisos para acceder a esta sección.", "danger")
                 return redirect(url_for("dashboard"))
             return view_func(*args, **kwargs)
-
         return wrapper
-
     return decorator
 
 
@@ -146,6 +154,14 @@ def current_captcha_question() -> str:
     return f"{session.get('captcha_a', 0)} + {session.get('captcha_b', 0)}"
 
 
+def build_qr_data_url(data: str) -> str:
+    qr_img = qrcode.make(data)
+    buffer = io.BytesIO()
+    qr_img.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    return f"data:image/png;base64,{encoded}"
+
+
 def register_routes(app):
     @app.context_processor
     def inject_nav_badges():
@@ -171,6 +187,8 @@ def register_routes(app):
             "static",
             "set_security_question",
             "account",
+            "two_factor_setup",
+            "two_factor_disable",
         }
         if current_user.is_authenticated and getattr(current_user, "must_change_password", False):
             if request.endpoint not in allowed_endpoints:
@@ -206,6 +224,8 @@ def register_routes(app):
                 captcha_failed_attempts=0,
                 is_banned=False,
                 pending_admin_review=False,
+                two_factor_enabled=False,
+                two_factor_secret=None,
             )
             user.set_password(form.password.data)
             db.session.add(user)
@@ -343,6 +363,12 @@ def register_routes(app):
                     user.captcha_failed_attempts = 0
                     db.session.commit()
 
+                if user.two_factor_enabled and user.two_factor_secret:
+                    session["pending_2fa_user_id"] = user.id
+                    set_captcha_challenge()
+                    audit("login_password_step_ok", f"Primer factor correcto para {user.email}")
+                    return redirect(url_for("two_factor_login"))
+
                 login_user(user)
                 audit("login_success", f"Inicio de sesión correcto para {user.email}")
                 set_captcha_challenge()
@@ -357,10 +383,44 @@ def register_routes(app):
 
         return render_template("login.html", form=form, captcha_question=captcha_question)
 
+    @app.route("/login/2fa", methods=["GET", "POST"])
+    def two_factor_login():
+        if current_user.is_authenticated:
+            return redirect(url_for("dashboard"))
+
+        user_id = session.get("pending_2fa_user_id")
+        if not user_id:
+            flash("Primero debes iniciar sesión con correo y contraseña.", "warning")
+            return redirect(url_for("login"))
+
+        user = User.query.get(user_id)
+        if not user or not user.two_factor_enabled or not user.two_factor_secret:
+            session.pop("pending_2fa_user_id", None)
+            flash("No se ha podido continuar con la verificación 2FA.", "danger")
+            return redirect(url_for("login"))
+
+        form = TwoFactorLoginForm()
+        if form.validate_on_submit():
+            totp = pyotp.TOTP(user.two_factor_secret)
+            if totp.verify(form.token.data.strip(), valid_window=1):
+                session.pop("pending_2fa_user_id", None)
+                login_user(user)
+                audit("login_success_2fa", f"Inicio de sesión con 2FA correcto para {user.email}")
+                flash("Sesión iniciada correctamente.", "success")
+                if user.must_change_password:
+                    return redirect(url_for("change_password"))
+                return redirect(url_for("dashboard"))
+
+            audit("login_failure_2fa", f"Código 2FA incorrecto para {user.email}")
+            flash("Código de autenticación incorrecto.", "danger")
+
+        return render_template("two_factor_login.html", form=form)
+
     @app.route("/logout")
     @login_required
     def logout():
         logout_user()
+        session.pop("pending_2fa_user_id", None)
         flash("Sesión cerrada.", "info")
         return redirect(url_for("login"))
 
@@ -399,6 +459,49 @@ def register_routes(app):
             return redirect(url_for("account"))
 
         return render_template("set_security_question.html", form=form)
+
+    @app.route("/account/2fa", methods=["GET", "POST"])
+    @login_required
+    def two_factor_setup():
+        form = TwoFactorSetupForm()
+
+        if not current_user.two_factor_secret:
+            current_user.two_factor_secret = pyotp.random_base32()
+            db.session.commit()
+
+        totp = pyotp.TOTP(current_user.two_factor_secret)
+        provisioning_uri = totp.provisioning_uri(
+            name=current_user.email,
+            issuer_name="LabGuard",
+        )
+        qr_data_url = build_qr_data_url(provisioning_uri)
+
+        if form.validate_on_submit():
+            if totp.verify(form.token.data.strip(), valid_window=1):
+                current_user.two_factor_enabled = True
+                db.session.commit()
+                audit("2fa_enabled", f"2FA activado por {current_user.email}")
+                flash("2FA activado correctamente.", "success")
+                return redirect(url_for("account"))
+
+            flash("El código introducido no es válido.", "danger")
+
+        return render_template(
+            "two_factor_setup.html",
+            form=form,
+            qr_data_url=qr_data_url,
+            secret=current_user.two_factor_secret,
+        )
+
+    @app.route("/account/2fa/disable", methods=["POST"])
+    @login_required
+    def two_factor_disable():
+        current_user.two_factor_enabled = False
+        current_user.two_factor_secret = None
+        db.session.commit()
+        audit("2fa_disabled", f"2FA desactivado por {current_user.email}")
+        flash("2FA desactivado correctamente.", "info")
+        return redirect(url_for("account"))
 
     @app.route("/dashboard")
     @login_required
@@ -452,6 +555,8 @@ def register_routes(app):
                 captcha_failed_attempts=0,
                 is_banned=False,
                 pending_admin_review=False,
+                two_factor_enabled=False,
+                two_factor_secret=None,
             )
             user.set_password(form.password.data)
             db.session.add(user)
@@ -821,9 +926,12 @@ def register_routes(app):
     @login_required
     def incidents_list():
         if current_user.role == "technician":
-            pending_incidents = Incident.query.filter_by(pending_technician_review=True).all()
-            if pending_incidents:
-                for incident in pending_incidents:
+            unread_incidents = Incident.query.filter(
+                Incident.pending_technician_review == True,
+                Incident.status == "open"
+            ).all()
+            if unread_incidents:
+                for incident in unread_incidents:
                     incident.pending_technician_review = False
                 db.session.commit()
 

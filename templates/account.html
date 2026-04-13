@@ -8,10 +8,19 @@
   <p><strong>Rol:</strong> {{ current_user.role }}</p>
   <p><strong>Fecha de alta:</strong> {{ format_datetime(current_user.created_at) }}</p>
   <p><strong>Pregunta de seguridad:</strong> {{ security_question_label(current_user.security_question) }}</p>
+  <p><strong>2FA:</strong> {{ 'Activado' if current_user.two_factor_enabled else 'Desactivado' }}</p>
 </div>
 
 <p style="margin-top:20px;">
   <a class="btn" href="{{ url_for('change_password') }}">Cambiar contraseña</a>
   <a class="btn btn-secondary" href="{{ url_for('set_security_question') }}">Configurar pregunta de seguridad</a>
+  {% if current_user.two_factor_enabled %}
+    <form method="post" action="{{ url_for('two_factor_disable') }}" class="inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-danger">Desactivar 2FA</button>
+    </form>
+  {% else %}
+    <a class="btn btn-secondary" href="{{ url_for('two_factor_setup') }}">Activar 2FA</a>
+  {% endif %}
 </p>
 {% endblock %}

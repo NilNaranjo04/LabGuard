@@ -44,6 +44,11 @@ class LoginForm(FlaskForm):
     submit = SubmitField("Entrar")
 
 
+class TwoFactorLoginForm(FlaskForm):
+    token = StringField("Código de autenticación", validators=[InputRequired(), Length(min=6, max=6)], render_kw={"required": True, "maxlength": 6})
+    submit = SubmitField("Verificar")
+
+
 class UserForm(FlaskForm):
     name = StringField("Nombre", validators=[InputRequired(), Length(max=120)], render_kw={"required": True})
     email = StringField("Correo", validators=[InputRequired(), Email(), Length(max=120)], render_kw={"required": True})
@@ -114,6 +119,11 @@ class ResetPasswordWithQuestionForm(FlaskForm):
         render_kw={"required": True},
     )
     submit = SubmitField("Restablecer contraseña")
+
+
+class TwoFactorSetupForm(FlaskForm):
+    token = StringField("Código de verificación", validators=[InputRequired(), Length(min=6, max=6)], render_kw={"required": True, "maxlength": 6})
+    submit = SubmitField("Activar 2FA")
 
 
 class EquipmentForm(FlaskForm):

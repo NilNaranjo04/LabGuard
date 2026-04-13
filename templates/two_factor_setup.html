@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Activar 2FA</h1>
+
+<p>Escanea este QR con Google Authenticator, Authy o Aegis.</p>
+
+<div class="card" style="max-width:420px;">
+  <img src="{{ qr_data_url }}" alt="QR 2FA" style="max-width:100%;height:auto;">
+  <p><strong>Clave manual:</strong> {{ secret }}</p>
+</div>
+
+<form method="post" style="margin-top:20px;">
+  {{ form.hidden_tag() }}
+
+  <label>{{ form.token.label }}</label>
+  {{ form.token() }}
+  {% for error in form.token.errors %}
+    <div class="flash danger">{{ error }}</div>
+  {% endfor %}
+
+  {{ form.submit(class_='btn') }}
+</form>
+{% endblock %}
