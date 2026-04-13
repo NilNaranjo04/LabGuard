@@ -22,9 +22,9 @@
       <td>{{ loan.equipment.asset_tag }}</td>
       <td>{{ loan.requester.name }}</td>
       <td>{{ loan.requested_days }}</td>
-      <td>{{ loan.created_at.strftime('%Y-%m-%d %H:%M') if loan.created_at else '' }}</td>
+      <td>{{ format_datetime(loan.created_at) }}</td>
       <td>
-        {{ loan.due_at.strftime('%Y-%m-%d %H:%M') if loan.due_at else '-' }}
+        {{ format_datetime(loan.due_at) if loan.due_at else '-' }}
         {% if loan.due_at and loan.due_at < now %}
           <br><span class="flash danger" style="display:inline-block;padding:4px 8px;">Fuera de plazo</span>
         {% endif %}

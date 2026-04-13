@@ -1,8 +1,9 @@
 import os
+import random
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import Flask, flash, redirect, render_template, request, url_for
+from flask import Flask, flash, redirect, render_template, request, session, url_for
 from flask_wtf.csrf import CSRFProtect
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
 from sqlalchemy import inspect
@@ -12,11 +13,15 @@ from forms import (
     ChangePasswordForm,
     EditUserForm,
     EquipmentForm,
+    ForgotPasswordRequestForm,
     IncidentForm,
     IncidentResponseForm,
     LoanForm,
     LoginForm,
     RegistrationForm,
+    ResetPasswordWithQuestionForm,
+    SecurityQuestionForm,
+    SECURITY_QUESTION_CHOICES,
     UserForm,
 )
 from models import AuditLog, Equipment, Incident, Loan, User, db
@@ -44,6 +49,7 @@ def create_app():
         ensure_schema()
 
     register_routes(app)
+    app.jinja_env.globals.update(format_datetime=format_datetime)
     return app
 
 
@@ -52,16 +58,29 @@ def ensure_schema():
 
     user_columns = {col["name"] for col in inspector.get_columns("user")}
     loan_columns = {col["name"] for col in inspector.get_columns("loan")}
+    incident_columns = {col["name"] for col in inspector.get_columns("incident")}
 
     with db.engine.begin() as conn:
         if "must_change_password" not in user_columns:
             conn.exec_driver_sql("ALTER TABLE user ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT 0")
         if "approval_status" not in user_columns:
             conn.exec_driver_sql("ALTER TABLE user ADD COLUMN approval_status VARCHAR(20) NOT NULL DEFAULT 'approved'")
+        if "security_question" not in user_columns:
+            conn.exec_driver_sql("ALTER TABLE user ADD COLUMN security_question VARCHAR(255)")
+        if "security_answer_hash" not in user_columns:
+            conn.exec_driver_sql("ALTER TABLE user ADD COLUMN security_answer_hash VARCHAR(255)")
+        if "captcha_failed_attempts" not in user_columns:
+            conn.exec_driver_sql("ALTER TABLE user ADD COLUMN captcha_failed_attempts INTEGER NOT NULL DEFAULT 0")
+        if "is_banned" not in user_columns:
+            conn.exec_driver_sql("ALTER TABLE user ADD COLUMN is_banned BOOLEAN NOT NULL DEFAULT 0")
+        if "pending_admin_review" not in user_columns:
+            conn.exec_driver_sql("ALTER TABLE user ADD COLUMN pending_admin_review BOOLEAN NOT NULL DEFAULT 0")
         if "requested_days" not in loan_columns:
             conn.exec_driver_sql("ALTER TABLE loan ADD COLUMN requested_days INTEGER NOT NULL DEFAULT 1")
         if "due_at" not in loan_columns:
             conn.exec_driver_sql("ALTER TABLE loan ADD COLUMN due_at DATETIME")
+        if "pending_technician_review" not in incident_columns:
+            conn.exec_driver_sql("ALTER TABLE incident ADD COLUMN pending_technician_review BOOLEAN NOT NULL DEFAULT 0")
 
 
 @login_manager.user_loader
@@ -79,7 +98,9 @@ def role_required(*allowed_roles):
                 flash("No tienes permisos para acceder a esta sección.", "danger")
                 return redirect(url_for("dashboard"))
             return view_func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -101,10 +122,56 @@ def label_from_choice(value: str, choices) -> str:
     return dict(choices).get(value, value)
 
 
+def security_question_label(value: str) -> str:
+    return dict(SECURITY_QUESTION_CHOICES).get(value, value or "No configurada")
+
+
+def format_datetime(value) -> str:
+    if not value:
+        return "-"
+    return value.strftime("%d-%m-%Y %H:%M")
+
+
+def set_captcha_challenge() -> None:
+    a = random.randint(1, 9)
+    b = random.randint(1, 9)
+    session["captcha_a"] = a
+    session["captcha_b"] = b
+    session["captcha_expected"] = a + b
+
+
+def current_captcha_question() -> str:
+    if "captcha_expected" not in session:
+        set_captcha_challenge()
+    return f"{session.get('captcha_a', 0)} + {session.get('captcha_b', 0)}"
+
+
 def register_routes(app):
+    @app.context_processor
+    def inject_nav_badges():
+        technician_incidents_badge = 0
+        admin_banned_badge = 0
+
+        if current_user.is_authenticated:
+            if current_user.role == "technician":
+                technician_incidents_badge = Incident.query.filter_by(pending_technician_review=True).count()
+            if current_user.role == "admin":
+                admin_banned_badge = User.query.filter_by(pending_admin_review=True).count()
+
+        return {
+            "technician_incidents_badge": technician_incidents_badge,
+            "admin_banned_badge": admin_banned_badge,
+        }
+
     @app.before_request
     def force_password_change():
-        allowed_endpoints = {"change_password", "logout", "static"}
+        allowed_endpoints = {
+            "change_password",
+            "logout",
+            "static",
+            "set_security_question",
+            "account",
+        }
         if current_user.is_authenticated and getattr(current_user, "must_change_password", False):
             if request.endpoint not in allowed_endpoints:
                 flash("Debes cambiar la contraseña antes de continuar.", "warning")
@@ -136,6 +203,9 @@ def register_routes(app):
                 active=False,
                 approval_status="pending",
                 must_change_password=False,
+                captcha_failed_attempts=0,
+                is_banned=False,
+                pending_admin_review=False,
             )
             user.set_password(form.password.data)
             db.session.add(user)
@@ -146,37 +216,146 @@ def register_routes(app):
 
         return render_template("register.html", form=form)
 
+    @app.route("/forgot-password", methods=["GET", "POST"])
+    def forgot_password():
+        if current_user.is_authenticated:
+            return redirect(url_for("dashboard"))
+
+        form = ForgotPasswordRequestForm()
+        if form.validate_on_submit():
+            email = form.email.data.lower().strip()
+            user = User.query.filter_by(email=email, active=True, approval_status="approved").first()
+
+            if not user:
+                flash("No existe una cuenta activa con ese correo.", "danger")
+                return render_template("forgot_password.html", form=form)
+
+            if user.is_banned:
+                flash("Esta cuenta está bloqueada. Debe intervenir un administrador.", "danger")
+                return render_template("forgot_password.html", form=form)
+
+            if not user.security_question or not user.security_answer_hash:
+                flash("Esta cuenta no tiene configurada una pregunta de seguridad.", "warning")
+                return render_template("forgot_password.html", form=form)
+
+            session["password_reset_user_id"] = user.id
+            return redirect(url_for("reset_password_with_question"))
+
+        return render_template("forgot_password.html", form=form)
+
+    @app.route("/reset-password-with-question", methods=["GET", "POST"])
+    def reset_password_with_question():
+        if current_user.is_authenticated:
+            return redirect(url_for("dashboard"))
+
+        user_id = session.get("password_reset_user_id")
+        if not user_id:
+            flash("Primero debes indicar el correo de la cuenta.", "warning")
+            return redirect(url_for("forgot_password"))
+
+        user = User.query.get(user_id)
+        if not user:
+            session.pop("password_reset_user_id", None)
+            flash("No se ha podido continuar con la recuperación.", "danger")
+            return redirect(url_for("forgot_password"))
+
+        form = ResetPasswordWithQuestionForm()
+        question_label = security_question_label(user.security_question)
+
+        if form.validate_on_submit():
+            if not user.check_security_answer(form.security_answer.data):
+                audit("password_recovery_failed", f"Fallo en recuperación de contraseña para {user.email}")
+                flash("La respuesta de seguridad no es correcta.", "danger")
+                return render_template("reset_password_with_question.html", form=form, question_label=question_label)
+
+            user.set_password(form.password.data.strip())
+            user.must_change_password = False
+            db.session.commit()
+            session.pop("password_reset_user_id", None)
+            audit("password_recovered", f"Contraseña restablecida para {user.email}")
+            flash("Contraseña restablecida correctamente. Ya puedes iniciar sesión.", "success")
+            return redirect(url_for("login"))
+
+        return render_template("reset_password_with_question.html", form=form, question_label=question_label)
+
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if current_user.is_authenticated:
             return redirect(url_for("dashboard"))
 
         form = LoginForm()
+        captcha_question = current_captcha_question()
+
         if form.validate_on_submit():
             email = form.email.data.lower().strip()
             user = User.query.filter_by(email=email).first()
 
+            if user and user.is_banned:
+                set_captcha_challenge()
+                flash("Esta cuenta está bloqueada por intentos fallidos de captcha. Solo un administrador puede desbanearla.", "danger")
+                audit("login_blocked_banned_user", f"Intento de acceso de cuenta baneada: {email}")
+                return render_template("login.html", form=form, captcha_question=current_captcha_question())
+
+            try:
+                captcha_answer = int(form.captcha_answer.data.strip())
+            except ValueError:
+                captcha_answer = None
+
+            expected_captcha = session.get("captcha_expected")
+
+            if captcha_answer != expected_captcha:
+                if user and user.role != "admin":
+                    user.captcha_failed_attempts = (user.captcha_failed_attempts or 0) + 1
+                    if user.captcha_failed_attempts >= 5:
+                        user.is_banned = True
+                        user.active = False
+                        user.pending_admin_review = True
+                        db.session.commit()
+                        set_captcha_challenge()
+                        audit("user_banned_by_captcha", f"Cuenta baneada por 5 captchas fallidos: {email}")
+                        flash("Has alcanzado 5 captchas fallidos. Tu cuenta ha quedado bloqueada hasta que un administrador la desbanee.", "danger")
+                        return render_template("login.html", form=form, captcha_question=current_captcha_question())
+
+                    db.session.commit()
+                    audit("captcha_failure", f"Captcha fallido para {email}. Intentos acumulados: {user.captcha_failed_attempts}")
+                    flash(f"Captcha incorrecto. Llevas {user.captcha_failed_attempts} de 5 intentos.", "danger")
+                else:
+                    audit("captcha_failure_admin_or_unknown", f"Captcha fallido para {email}")
+                    flash("Captcha incorrecto.", "danger")
+
+                set_captcha_challenge()
+                return render_template("login.html", form=form, captcha_question=current_captcha_question())
+
             if user and user.approval_status == "pending":
+                set_captcha_challenge()
                 flash("Tu cuenta todavía está pendiente de validación por parte del administrador.", "warning")
                 audit("login_pending_user", f"Intento de acceso de cuenta pendiente: {email}")
-                return render_template("login.html", form=form)
+                return render_template("login.html", form=form, captcha_question=current_captcha_question())
 
             if user and user.approval_status == "rejected":
+                set_captcha_challenge()
                 flash("Tu solicitud de cuenta fue rechazada por el administrador.", "danger")
                 audit("login_rejected_user", f"Intento de acceso de cuenta rechazada: {email}")
-                return render_template("login.html", form=form)
+                return render_template("login.html", form=form, captcha_question=current_captcha_question())
 
             if user and user.active and user.check_password(form.password.data):
+                if user.role != "admin":
+                    user.captcha_failed_attempts = 0
+                    db.session.commit()
+
                 login_user(user)
                 audit("login_success", f"Inicio de sesión correcto para {user.email}")
+                set_captcha_challenge()
                 flash("Sesión iniciada.", "success")
                 if user.must_change_password:
                     return redirect(url_for("change_password"))
                 return redirect(url_for("dashboard"))
 
             audit("login_failure", f"Intento fallido para {email}")
+            set_captcha_challenge()
             flash("Credenciales no válidas.", "danger")
-        return render_template("login.html", form=form)
+
+        return render_template("login.html", form=form, captcha_question=captcha_question)
 
     @app.route("/logout")
     @login_required
@@ -188,7 +367,7 @@ def register_routes(app):
     @app.route("/account")
     @login_required
     def account():
-        return render_template("account.html")
+        return render_template("account.html", security_question_label=security_question_label)
 
     @app.route("/account/change-password", methods=["GET", "POST"])
     @login_required
@@ -202,6 +381,24 @@ def register_routes(app):
             flash("Contraseña actualizada correctamente.", "success")
             return redirect(url_for("dashboard"))
         return render_template("change_password.html", form=form)
+
+    @app.route("/account/security-question", methods=["GET", "POST"])
+    @login_required
+    def set_security_question():
+        form = SecurityQuestionForm()
+
+        if request.method == "GET" and current_user.security_question:
+            form.security_question.data = current_user.security_question
+
+        if form.validate_on_submit():
+            current_user.security_question = form.security_question.data
+            current_user.set_security_answer(form.security_answer.data)
+            db.session.commit()
+            audit("security_question_updated", f"Pregunta de seguridad actualizada por {current_user.email}")
+            flash("Pregunta de seguridad guardada correctamente.", "success")
+            return redirect(url_for("account"))
+
+        return render_template("set_security_question.html", form=form)
 
     @app.route("/dashboard")
     @login_required
@@ -218,6 +415,12 @@ def register_routes(app):
     @login_required
     @role_required("admin")
     def users_list():
+        pending_review_users = User.query.filter_by(pending_admin_review=True).all()
+        if pending_review_users:
+            for pending_user in pending_review_users:
+                pending_user.pending_admin_review = False
+            db.session.commit()
+
         users = User.query.filter(User.approval_status != "pending").order_by(User.created_at.desc()).all()
         pending_users = User.query.filter_by(approval_status="pending").order_by(User.created_at.desc()).all()
         return render_template("users_list.html", users=users, pending_users=pending_users)
@@ -246,6 +449,9 @@ def register_routes(app):
                 active=True,
                 approval_status="approved",
                 must_change_password=True,
+                captcha_failed_attempts=0,
+                is_banned=False,
+                pending_admin_review=False,
             )
             user.set_password(form.password.data)
             db.session.add(user)
@@ -270,6 +476,10 @@ def register_routes(app):
         user.active = True
         user.approval_status = "approved"
         user.must_change_password = True
+        if user.role != "admin":
+            user.is_banned = False
+            user.captcha_failed_attempts = 0
+            user.pending_admin_review = False
         db.session.commit()
         audit("user_approved", f"Cuenta aprobada: {user.email}")
         flash("Cuenta aprobada correctamente.", "success")
@@ -285,6 +495,21 @@ def register_routes(app):
         db.session.commit()
         audit("user_rejected", f"Cuenta rechazada: {user.email}")
         flash("Solicitud rechazada.", "info")
+        return redirect(url_for("users_list"))
+
+    @app.route("/users/<int:user_id>/unban", methods=["POST"])
+    @login_required
+    @role_required("admin")
+    def unban_user(user_id):
+        user = User.query.get_or_404(user_id)
+        user.is_banned = False
+        user.captcha_failed_attempts = 0
+        user.pending_admin_review = False
+        if user.approval_status == "approved":
+            user.active = True
+        db.session.commit()
+        audit("user_unbanned", f"Cuenta desbaneada por admin: {user.email}")
+        flash("Usuario desbaneado correctamente.", "success")
         return redirect(url_for("users_list"))
 
     @app.route("/users/<int:user_id>/edit", methods=["GET", "POST"])
@@ -595,10 +820,18 @@ def register_routes(app):
     @app.route("/incidents")
     @login_required
     def incidents_list():
+        if current_user.role == "technician":
+            pending_incidents = Incident.query.filter_by(pending_technician_review=True).all()
+            if pending_incidents:
+                for incident in pending_incidents:
+                    incident.pending_technician_review = False
+                db.session.commit()
+
         if current_user.role in ["admin", "technician"]:
             incidents = Incident.query.order_by(Incident.created_at.desc()).all()
         else:
             incidents = Incident.query.filter_by(reporter_id=current_user.id).order_by(Incident.created_at.desc()).all()
+
         response_form = IncidentResponseForm()
         return render_template("incident_list.html", incidents=incidents, response_form=response_form)
 
@@ -621,6 +854,7 @@ def register_routes(app):
                 severity=form.severity.data,
                 description=form.description.data.strip(),
                 status="open",
+                pending_technician_review=True,
             )
             db.session.add(incident)
             db.session.commit()

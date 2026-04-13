@@ -23,7 +23,7 @@
       <td>{{ user.id }}</td>
       <td>{{ user.name }}</td>
       <td>{{ user.email }}</td>
-      <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else '' }}</td>
+      <td>{{ format_datetime(user.created_at) }}</td>
       <td>
         <form method="post" action="{{ url_for('approve_user', user_id=user.id) }}" class="inline">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -51,6 +51,8 @@
       <th>Rol</th>
       <th>Activo</th>
       <th>Estado</th>
+      <th>Baneado</th>
+      <th>Fallos captcha</th>
       <th>Creado</th>
       <th>Acciones</th>
     </tr>
@@ -64,9 +66,19 @@
       <td>{{ user.role }}</td>
       <td>{{ 'Sí' if user.active else 'No' }}</td>
       <td>{{ user.approval_status }}</td>
-      <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else '' }}</td>
+      <td>{{ 'Sí' if user.is_banned else 'No' }}</td>
+      <td>{{ user.captcha_failed_attempts }}</td>
+      <td>{{ format_datetime(user.created_at) }}</td>
       <td>
         <a class="btn btn-secondary" href="{{ url_for('edit_user', user_id=user.id) }}">Editar</a>
+
+        {% if user.is_banned %}
+        <form method="post" action="{{ url_for('unban_user', user_id=user.id) }}" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn">Desbanear</button>
+        </form>
+        {% endif %}
+
         {% if user.id != current_user.id %}
         <form method="post" action="{{ url_for('delete_user', user_id=user.id) }}" class="inline" onsubmit="return confirm('¿Seguro que quieres eliminar este usuario?');">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

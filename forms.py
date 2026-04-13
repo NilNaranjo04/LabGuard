@@ -28,10 +28,19 @@ STATUS_CHOICES = [
     ("retired", "Retirado"),
 ]
 
+SECURITY_QUESTION_CHOICES = [
+    ("pet", "¿Cómo se llamaba tu primera mascota?"),
+    ("school", "¿Cuál fue el nombre de tu primer colegio?"),
+    ("city", "¿En qué ciudad naciste?"),
+    ("teacher", "¿Cómo se llamaba tu profesor o profesora favorita?"),
+    ("movie", "¿Cuál fue la primera película que recuerdas haber visto en el cine?"),
+]
+
 
 class LoginForm(FlaskForm):
     email = StringField("Correo", validators=[InputRequired(), Email(), Length(max=120)], render_kw={"required": True})
     password = PasswordField("Contraseña", validators=[InputRequired(), Length(min=8, max=128)], render_kw={"required": True})
+    captcha_answer = StringField("Resultado del captcha", validators=[InputRequired(), Length(max=10)], render_kw={"required": True})
     submit = SubmitField("Entrar")
 
 
@@ -71,6 +80,40 @@ class EditUserForm(FlaskForm):
 class ChangePasswordForm(FlaskForm):
     password = PasswordField("Nueva contraseña", validators=[InputRequired(), Length(min=8, max=128)], render_kw={"required": True})
     submit = SubmitField("Guardar nueva contraseña")
+
+
+class SecurityQuestionForm(FlaskForm):
+    security_question = SelectField(
+        "Pregunta de seguridad",
+        choices=SECURITY_QUESTION_CHOICES,
+        validators=[InputRequired()],
+        render_kw={"required": True},
+    )
+    security_answer = StringField(
+        "Respuesta",
+        validators=[InputRequired(), Length(min=2, max=120)],
+        render_kw={"required": True},
+    )
+    submit = SubmitField("Guardar pregunta de seguridad")
+
+
+class ForgotPasswordRequestForm(FlaskForm):
+    email = StringField("Correo", validators=[InputRequired(), Email(), Length(max=120)], render_kw={"required": True})
+    submit = SubmitField("Continuar")
+
+
+class ResetPasswordWithQuestionForm(FlaskForm):
+    security_answer = StringField(
+        "Respuesta de seguridad",
+        validators=[InputRequired(), Length(min=2, max=120)],
+        render_kw={"required": True},
+    )
+    password = PasswordField(
+        "Nueva contraseña",
+        validators=[InputRequired(), Length(min=8, max=128)],
+        render_kw={"required": True},
+    )
+    submit = SubmitField("Restablecer contraseña")
 
 
 class EquipmentForm(FlaskForm):

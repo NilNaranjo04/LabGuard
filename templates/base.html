@@ -7,7 +7,7 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 0; background: #f4f6f8; color: #1f2937; }
     nav { background: #0f172a; color: white; padding: 14px 24px; }
-    nav a { color: white; margin-right: 16px; text-decoration: none; }
+    nav a { color: white; margin-right: 16px; text-decoration: none; position: relative; display: inline-block; }
     .container { max-width: 1100px; margin: 24px auto; background: white; padding: 24px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
     .flash { padding: 10px 12px; border-radius: 6px; margin-bottom: 10px; }
     .success { background: #dcfce7; }
@@ -24,6 +24,21 @@
     .card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: 10px; }
     .muted { color: #64748b; }
     .inline { display: inline; }
+    .nav-badge {
+      position: absolute;
+      top: -8px;
+      right: -10px;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 4px;
+      border-radius: 999px;
+      background: #dc2626;
+      color: white;
+      font-size: 11px;
+      line-height: 18px;
+      text-align: center;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -31,15 +46,30 @@
     {% if current_user.is_authenticated %}
       <a href="{{ url_for('dashboard') }}">Dashboard</a>
       <a href="{{ url_for('equipment_list') }}">Equipos</a>
+
       {% if current_user.role == 'admin' %}
         <a href="{{ url_for('loaned_equipment') }}">Equipos prestados</a>
       {% endif %}
+
       <a href="{{ url_for('loans_list') }}">Préstamos</a>
-      <a href="{{ url_for('incidents_list') }}">Incidencias</a>
+
+      <a href="{{ url_for('incidents_list') }}">
+        Incidencias
+        {% if current_user.role == 'technician' and technician_incidents_badge > 0 %}
+          <span class="nav-badge">{{ technician_incidents_badge }}</span>
+        {% endif %}
+      </a>
+
       {% if current_user.role == 'admin' %}
-        <a href="{{ url_for('users_list') }}">Usuarios</a>
+        <a href="{{ url_for('users_list') }}">
+          Usuarios
+          {% if admin_banned_badge > 0 %}
+            <span class="nav-badge">{{ admin_banned_badge }}</span>
+          {% endif %}
+        </a>
         <a href="{{ url_for('audit_list') }}">Auditoría</a>
       {% endif %}
+
       <a href="{{ url_for('account') }}">Mi cuenta</a>
       <a href="{{ url_for('logout') }}" style="float:right">Salir</a>
     {% else %}

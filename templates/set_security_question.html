@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Configurar pregunta de seguridad</h1>
+
+<form method="post">
+  {{ form.hidden_tag() }}
+
+  <label>{{ form.security_question.label }}</label>
+  {{ form.security_question() }}
+  {% for error in form.security_question.errors %}
+    <div class="flash danger">{{ error }}</div>
+  {% endfor %}
+
+  <label>{{ form.security_answer.label }}</label>
+  {{ form.security_answer() }}
+  {% for error in form.security_answer.errors %}
+    <div class="flash danger">{{ error }}</div>
+  {% endfor %}
+
+  {{ form.submit(class_='btn') }}
+</form>
+{% endblock %}

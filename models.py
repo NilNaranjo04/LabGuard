@@ -15,6 +15,11 @@ class User(UserMixin, db.Model):
     active = db.Column(db.Boolean, nullable=False, default=True)
     must_change_password = db.Column(db.Boolean, nullable=False, default=False)
     approval_status = db.Column(db.String(20), nullable=False, default="approved")
+    security_question = db.Column(db.String(255), nullable=True)
+    security_answer_hash = db.Column(db.String(255), nullable=True)
+    captcha_failed_attempts = db.Column(db.Integer, nullable=False, default=0)
+    is_banned = db.Column(db.Boolean, nullable=False, default=False)
+    pending_admin_review = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     loans = db.relationship("Loan", back_populates="requester", foreign_keys="Loan.requester_id")
@@ -25,6 +30,14 @@ class User(UserMixin, db.Model):
 
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
+
+    def set_security_answer(self, answer: str) -> None:
+        self.security_answer_hash = generate_password_hash(answer.strip().lower())
+
+    def check_security_answer(self, answer: str) -> bool:
+        if not self.security_answer_hash:
+            return False
+        return check_password_hash(self.security_answer_hash, answer.strip().lower())
 
 
 class Equipment(db.Model):
@@ -69,6 +82,7 @@ class Incident(db.Model):
     responded_by_email = db.Column(db.String(120), nullable=True)
     responded_at = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), nullable=False, default="open")
+    pending_technician_review = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 

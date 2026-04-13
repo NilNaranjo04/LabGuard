@@ -29,7 +29,7 @@
       <td>{{ loan.requested_days }}</td>
       <td>
         {% if loan.due_at %}
-          {{ loan.due_at.strftime('%Y-%m-%d %H:%M') }}
+          {{ format_datetime(loan.due_at) }}
           {% if loan.status == 'delivered' and loan.due_at < now %}
             <br><span class="flash danger" style="display:inline-block;padding:4px 8px;">Fuera de plazo</span>
           {% endif %}
