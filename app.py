@@ -7,6 +7,7 @@ from functools import wraps
 
 import pyotp
 import qrcode
+import requests
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 from flask_wtf.csrf import CSRFProtect
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
@@ -162,6 +163,155 @@ def build_qr_data_url(data: str) -> str:
     return f"data:image/png;base64,{encoded}"
 
 
+def send_telegram_message(title: str, lines: list[str]) -> None:
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+
+    if not token or not chat_id:
+        return
+
+    text = f"{title}\n\n" + "\n".join(lines)
+
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            data={"chat_id": chat_id, "text": text},
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
+def notify_new_registration(user: User) -> None:
+    send_telegram_message(
+        "👤 Nueva solicitud de cuenta en LabGuard",
+        [
+            f"Nombre: {user.name}",
+            f"Correo: {user.email}",
+            f"Rol solicitado: {user.role}",
+            f"Fecha: {format_datetime(user.created_at)}",
+            "Acción: revisar en Usuarios",
+        ],
+    )
+
+
+def notify_new_incident(incident: Incident) -> None:
+    equipment_name = incident.equipment.name if incident.equipment else "Sin equipo"
+    equipment_tag = incident.equipment.asset_tag if incident.equipment else "-"
+    reporter_name = incident.reporter.name if incident.reporter else "Desconocido"
+
+    send_telegram_message(
+        "🚨 Nueva incidencia en LabGuard",
+        [
+            f"ID: {incident.id}",
+            f"Título: {incident.title}",
+            f"Severidad: {incident.severity}",
+            f"Usuario: {reporter_name}",
+            f"Equipo: {equipment_name} ({equipment_tag})",
+            f"Fecha: {format_datetime(incident.created_at)}",
+            f"Descripción: {incident.description}",
+        ],
+    )
+
+
+def notify_new_loan(loan: Loan) -> None:
+    send_telegram_message(
+        "📦 Nueva solicitud de préstamo",
+        [
+            f"ID préstamo: {loan.id}",
+            f"Usuario: {loan.requester.name}",
+            f"Correo: {loan.requester.email}",
+            f"Equipo: {loan.equipment.name} ({loan.equipment.asset_tag})",
+            f"Días solicitados: {loan.requested_days}",
+            f"Fecha límite: {format_datetime(loan.due_at)}",
+            f"Finalidad: {loan.purpose}",
+        ],
+    )
+
+
+def notify_loan_status_change(loan: Loan, new_state: str) -> None:
+    send_telegram_message(
+        "🔄 Cambio en préstamo",
+        [
+            f"ID préstamo: {loan.id}",
+            f"Usuario: {loan.requester.name}",
+            f"Equipo: {loan.equipment.name} ({loan.equipment.asset_tag})",
+            f"Nuevo estado: {new_state}",
+            f"Fecha: {format_datetime(datetime.utcnow())}",
+        ],
+    )
+
+
+def notify_user_banned(user: User) -> None:
+    send_telegram_message(
+        "⛔ Usuario baneado por captcha",
+        [
+            f"Nombre: {user.name}",
+            f"Correo: {user.email}",
+            f"Rol: {user.role}",
+            f"Intentos fallidos: {user.captcha_failed_attempts}",
+            f"Fecha: {format_datetime(datetime.utcnow())}",
+        ],
+    )
+
+
+def notify_user_unbanned(user: User) -> None:
+    send_telegram_message(
+        "✅ Usuario desbaneado",
+        [
+            f"Nombre: {user.name}",
+            f"Correo: {user.email}",
+            f"Fecha: {format_datetime(datetime.utcnow())}",
+        ],
+    )
+
+
+def notify_user_approved(user: User) -> None:
+    send_telegram_message(
+        "✅ Cuenta aprobada",
+        [
+            f"Nombre: {user.name}",
+            f"Correo: {user.email}",
+            f"Rol: {user.role}",
+            f"Fecha: {format_datetime(datetime.utcnow())}",
+        ],
+    )
+
+
+def notify_user_rejected(user: User) -> None:
+    send_telegram_message(
+        "❌ Cuenta rechazada",
+        [
+            f"Nombre: {user.name}",
+            f"Correo: {user.email}",
+            f"Fecha: {format_datetime(datetime.utcnow())}",
+        ],
+    )
+
+
+def notify_incident_answered(incident: Incident) -> None:
+    send_telegram_message(
+        "🛠️ Incidencia respondida",
+        [
+            f"ID: {incident.id}",
+            f"Título: {incident.title}",
+            f"Respondida por: {incident.responded_by_email or '-'}",
+            f"Fecha: {format_datetime(incident.responded_at)}",
+        ],
+    )
+
+
+def notify_incident_closed(incident: Incident) -> None:
+    send_telegram_message(
+        "📁 Incidencia cerrada",
+        [
+            f"ID: {incident.id}",
+            f"Título: {incident.title}",
+            f"Fecha: {format_datetime(datetime.utcnow())}",
+        ],
+    )
+
+
 def register_routes(app):
     @app.context_processor
     def inject_nav_badges():
@@ -170,9 +320,20 @@ def register_routes(app):
 
         if current_user.is_authenticated:
             if current_user.role == "technician":
-                technician_incidents_badge = Incident.query.filter_by(pending_technician_review=True).count()
+                technician_incidents_badge = Incident.query.filter_by(
+                    pending_technician_review=True
+                ).count()
+
             if current_user.role == "admin":
-                admin_banned_badge = User.query.filter_by(pending_admin_review=True).count()
+                pending_banned = User.query.filter_by(
+                    pending_admin_review=True
+                ).count()
+
+                pending_accounts = User.query.filter_by(
+                    approval_status="pending"
+                ).count()
+
+                admin_banned_badge = pending_banned + pending_accounts
 
         return {
             "technician_incidents_badge": technician_incidents_badge,
@@ -230,6 +391,7 @@ def register_routes(app):
             user.set_password(form.password.data)
             db.session.add(user)
             db.session.commit()
+            notify_new_registration(user)
             audit("public_registration", f"Solicitud de cuenta creada para {email}")
             flash("Tu solicitud de cuenta se ha enviado. Un administrador debe validarla.", "success")
             return redirect(url_for("login"))
@@ -331,6 +493,7 @@ def register_routes(app):
                         user.active = False
                         user.pending_admin_review = True
                         db.session.commit()
+                        notify_user_banned(user)
                         set_captcha_challenge()
                         audit("user_banned_by_captcha", f"Cuenta baneada por 5 captchas fallidos: {email}")
                         flash("Has alcanzado 5 captchas fallidos. Tu cuenta ha quedado bloqueada hasta que un administrador la desbanee.", "danger")
@@ -586,6 +749,7 @@ def register_routes(app):
             user.captcha_failed_attempts = 0
             user.pending_admin_review = False
         db.session.commit()
+        notify_user_approved(user)
         audit("user_approved", f"Cuenta aprobada: {user.email}")
         flash("Cuenta aprobada correctamente.", "success")
         return redirect(url_for("users_list"))
@@ -598,6 +762,7 @@ def register_routes(app):
         user.active = False
         user.approval_status = "rejected"
         db.session.commit()
+        notify_user_rejected(user)
         audit("user_rejected", f"Cuenta rechazada: {user.email}")
         flash("Solicitud rechazada.", "info")
         return redirect(url_for("users_list"))
@@ -613,6 +778,7 @@ def register_routes(app):
         if user.approval_status == "approved":
             user.active = True
         db.session.commit()
+        notify_user_unbanned(user)
         audit("user_unbanned", f"Cuenta desbaneada por admin: {user.email}")
         flash("Usuario desbaneado correctamente.", "success")
         return redirect(url_for("users_list"))
@@ -867,6 +1033,10 @@ def register_routes(app):
                 return redirect(url_for("loan_new"))
 
             requested_days = int(form.requested_days.data)
+            if requested_days < 1 or requested_days > 30:
+                flash("Número de días inválido. El máximo permitido es 30.", "danger")
+                return redirect(url_for("loan_new"))
+
             due_at = datetime.utcnow() + timedelta(days=requested_days)
 
             loan = Loan(
@@ -879,6 +1049,7 @@ def register_routes(app):
             )
             db.session.add(loan)
             db.session.commit()
+            notify_new_loan(loan)
             audit("loan_requested", f"Préstamo solicitado #{loan.id} por {current_user.email} durante {requested_days} días")
             flash("Solicitud enviada.", "success")
             return redirect(url_for("loans_list"))
@@ -918,6 +1089,7 @@ def register_routes(app):
             loan.rejection_reason = "Rechazado por administración"
 
         db.session.commit()
+        notify_loan_status_change(loan, new_state)
         audit("loan_status_changed", f"Préstamo #{loan.id}: {expected} -> {new_state}")
         flash("Estado actualizado.", "success")
         return redirect(url_for("loans_list"))
@@ -966,6 +1138,7 @@ def register_routes(app):
             )
             db.session.add(incident)
             db.session.commit()
+            notify_new_incident(incident)
             audit("incident_created", f"Incidencia #{incident.id}: {incident.title}")
             flash("Incidencia registrada.", "success")
             return redirect(url_for("incidents_list"))
@@ -985,6 +1158,7 @@ def register_routes(app):
             incident.responded_at = datetime.utcnow()
             incident.status = "answered"
             db.session.commit()
+            notify_incident_answered(incident)
             audit("incident_answered", f"Incidencia #{incident.id} respondida por {current_user.email}")
             flash("Respuesta técnica guardada.", "success")
         else:
@@ -999,6 +1173,7 @@ def register_routes(app):
         incident = Incident.query.get_or_404(incident_id)
         incident.status = "closed"
         db.session.commit()
+        notify_incident_closed(incident)
         audit("incident_closed", f"Incidencia #{incident.id} cerrada")
         flash("Incidencia cerrada.", "success")
         return redirect(url_for("incidents_list"))
