@@ -63,9 +63,9 @@
       <td>{{ user.id }}</td>
       <td>{{ user.name }}</td>
       <td>{{ user.email }}</td>
-      <td>{{ user.role }}</td>
+      <td>{{ role_label(user.role) }}</td>
       <td>{{ 'Sí' if user.active else 'No' }}</td>
-      <td>{{ user.approval_status }}</td>
+      <td>{{ approval_status_label(user.approval_status) }}</td>
       <td>{{ 'Sí' if user.is_banned else 'No' }}</td>
       <td>{{ user.captcha_failed_attempts }}</td>
       <td>{{ format_datetime(user.created_at) }}</td>

@@ -19,20 +19,24 @@
 
   <label>{{ form.password.label }}</label>
   {{ form.password() }}
+  {% if password_optional %}
+    <p class="muted">Déjalo vacío si no quieres cambiarla.</p>
+  {% endif %}
   {% for error in form.password.errors %}
     <div class="flash danger">{{ error }}</div>
   {% endfor %}
-  {% if password_optional %}
-    <p class="muted">Si dejamos la contraseña vacía, se mantiene la actual.</p>
-  {% endif %}
 
   <label>{{ form.role.label }}</label>
-  {{ form.role() }}
+  <select id="{{ form.role.id }}" name="{{ form.role.name }}" required>
+    <option value="admin" {% if form.role.data == 'admin' %}selected{% endif %}>Administrador</option>
+    <option value="technician" {% if form.role.data == 'technician' %}selected{% endif %}>Técnico</option>
+    <option value="user" {% if form.role.data == 'user' %}selected{% endif %}>Usuario</option>
+  </select>
   {% for error in form.role.errors %}
     <div class="flash danger">{{ error }}</div>
   {% endfor %}
 
   {{ form.submit(class_='btn', value=submit_label) }}
-  <a class="btn btn-secondary" href="{{ url_for('users_list') }}">Volver</a>
+  <a class="btn btn-secondary" href="{{ url_for('users_list') }}">Cancelar</a>
 </form>
 {% endblock %}

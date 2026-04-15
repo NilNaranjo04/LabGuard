@@ -56,7 +56,14 @@ def create_app():
         ensure_schema()
 
     register_routes(app)
-    app.jinja_env.globals.update(format_datetime=format_datetime)
+    app.jinja_env.globals.update(
+        format_datetime=format_datetime,
+        role_label=role_label,
+        approval_status_label=approval_status_label,
+        loan_status_label=loan_status_label,
+        incident_severity_label=incident_severity_label,
+        incident_status_label=incident_status_label,
+    )
     return app
 
 
@@ -135,6 +142,50 @@ def security_question_label(value: str) -> str:
     return dict(SECURITY_QUESTION_CHOICES).get(value, value or "No configurada")
 
 
+def role_label(value: str) -> str:
+    return {
+        "admin": "Administrador",
+        "technician": "Técnico",
+        "user": "Usuario",
+    }.get(value, value)
+
+
+def approval_status_label(value: str) -> str:
+    return {
+        "approved": "Aprobado",
+        "pending": "Pendiente",
+        "rejected": "Rechazado",
+    }.get(value, value)
+
+
+def loan_status_label(value: str) -> str:
+    return {
+        "requested": "Solicitado",
+        "approved": "Aprobado",
+        "rejected": "Rechazado",
+        "delivered": "Entregado",
+        "returned": "Devuelto",
+        "closed": "Cerrado",
+    }.get(value, value)
+
+
+def incident_severity_label(value: str) -> str:
+    return {
+        "low": "Baja",
+        "medium": "Media",
+        "high": "Alta",
+        "critical": "Crítica",
+    }.get(value, value)
+
+
+def incident_status_label(value: str) -> str:
+    return {
+        "open": "Abierta",
+        "answered": "Respondida",
+        "closed": "Cerrada",
+    }.get(value, value)
+
+
 def format_datetime(value) -> str:
     if not value:
         return "-"
@@ -188,7 +239,7 @@ def notify_new_registration(user: User) -> None:
         [
             f"Nombre: {user.name}",
             f"Correo: {user.email}",
-            f"Rol solicitado: {user.role}",
+            f"Rol solicitado: {role_label(user.role)}",
             f"Fecha: {format_datetime(user.created_at)}",
             "Acción: revisar en Usuarios",
         ],
@@ -205,7 +256,7 @@ def notify_new_incident(incident: Incident) -> None:
         [
             f"ID: {incident.id}",
             f"Título: {incident.title}",
-            f"Severidad: {incident.severity}",
+            f"Severidad: {incident_severity_label(incident.severity)}",
             f"Usuario: {reporter_name}",
             f"Equipo: {equipment_name} ({equipment_tag})",
             f"Fecha: {format_datetime(incident.created_at)}",
@@ -236,7 +287,7 @@ def notify_loan_status_change(loan: Loan, new_state: str) -> None:
             f"ID préstamo: {loan.id}",
             f"Usuario: {loan.requester.name}",
             f"Equipo: {loan.equipment.name} ({loan.equipment.asset_tag})",
-            f"Nuevo estado: {new_state}",
+            f"Nuevo estado: {loan_status_label(new_state)}",
             f"Fecha: {format_datetime(datetime.utcnow())}",
         ],
     )
@@ -248,7 +299,7 @@ def notify_user_banned(user: User) -> None:
         [
             f"Nombre: {user.name}",
             f"Correo: {user.email}",
-            f"Rol: {user.role}",
+            f"Rol: {role_label(user.role)}",
             f"Intentos fallidos: {user.captcha_failed_attempts}",
             f"Fecha: {format_datetime(datetime.utcnow())}",
         ],
@@ -272,7 +323,7 @@ def notify_user_approved(user: User) -> None:
         [
             f"Nombre: {user.name}",
             f"Correo: {user.email}",
-            f"Rol: {user.role}",
+            f"Rol: {role_label(user.role)}",
             f"Fecha: {format_datetime(datetime.utcnow())}",
         ],
     )

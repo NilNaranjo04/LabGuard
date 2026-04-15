@@ -1,40 +1,77 @@
 {% extends 'base.html' %}
 {% block content %}
 <h1>Incidencias</h1>
-<p><a class="btn" href="{{ url_for('incident_new') }}">Nueva incidencia</a></p>
+
+<p><a class="btn" href="{{ url_for('incident_new') }}">Registrar incidencia</a></p>
+
 <table>
-  <tr><th>ID</th><th>Título</th><th>Equipo</th><th>Severidad</th><th>Estado</th><th>Reporta</th><th>Respuesta técnica</th><th>Acciones</th></tr>
-  {% for incident in incidents %}
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Fecha</th>
+      <th>Usuario</th>
+      <th>Equipo</th>
+      <th>Título</th>
+      <th>Severidad</th>
+      <th>Estado</th>
+      <th>Descripción</th>
+      <th>Respuesta técnica</th>
+      {% if current_user.role in ['admin', 'technician'] %}
+      <th>Acciones</th>
+      {% endif %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for incident in incidents %}
     <tr>
       <td>{{ incident.id }}</td>
-      <td>{{ incident.title }}<br><span class="muted">{{ incident.description }}</span></td>
-      <td>{{ incident.equipment.name if incident.equipment else '-' }}</td>
-      <td>{{ incident.severity }}</td>
-      <td>{{ incident.status }}</td>
-      <td>{{ incident.reporter.email }}</td>
+      <td>{{ format_datetime(incident.created_at) }}</td>
+      <td>{{ incident.reporter.name }}</td>
+      <td>
+        {% if incident.equipment %}
+          {{ incident.equipment.name }} ({{ incident.equipment.asset_tag }})
+        {% else %}
+          -
+        {% endif %}
+      </td>
+      <td>{{ incident.title }}</td>
+      <td>{{ incident_severity_label(incident.severity) }}</td>
+      <td>{{ incident_status_label(incident.status) }}</td>
+      <td>{{ incident.description }}</td>
       <td>
         {% if incident.technical_response %}
-          {{ incident.technical_response }}<br>
-          <span class="muted">Por {{ incident.responded_by_email }} el {{ incident.responded_at }}</span>
+          {{ incident.technical_response }}
+          <br><span class="muted">Por {{ incident.responded_by_email }} el {{ format_datetime(incident.responded_at) }}</span>
         {% else %}
-          -
+          <span class="muted">Sin respuesta</span>
         {% endif %}
       </td>
+
+      {% if current_user.role in ['admin', 'technician'] %}
       <td>
-        {% if current_user.role in ['admin', 'technician'] and incident.status in ['open', 'answered'] %}
-          {% if incident.status == 'open' %}
-            <form method="post" action="{{ url_for('incident_respond', incident_id=incident.id) }}">
-              {{ response_form.hidden_tag() }}
-              {{ response_form.response(placeholder='Respuesta del técnico o administrador') }}
-              <button type="submit">Responder</button>
-            </form>
-          {% endif %}
-          <form class="inline" method="post" action="{{ url_for('incident_close', incident_id=incident.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button>Cerrar</button></form>
+        {% if incident.status == 'open' %}
+        <form method="post" action="{{ url_for('incident_respond', incident_id=incident.id) }}">
+          {{ response_form.hidden_tag() }}
+          {{ response_form.response(rows=3, placeholder='Escribe una respuesta técnica...') }}
+          <button type="submit" class="btn">Responder</button>
+        </form>
+
+        <form method="post" action="{{ url_for('incident_close', incident_id=incident.id) }}" class="inline" style="margin-top:8px;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-secondary">Cerrar</button>
+        </form>
+        {% elif incident.status == 'answered' %}
+        <form method="post" action="{{ url_for('incident_close', incident_id=incident.id) }}" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-secondary">Cerrar</button>
+        </form>
         {% else %}
-          -
+        <span class="muted">Sin acciones</span>
         {% endif %}
       </td>
+      {% endif %}
     </tr>
-  {% endfor %}
+    {% endfor %}
+  </tbody>
 </table>
 {% endblock %}

@@ -44,14 +44,16 @@
 <body>
   <nav>
     {% if current_user.is_authenticated %}
-      <a href="{{ url_for('dashboard') }}">Dashboard</a>
+      <a href="{{ url_for('dashboard') }}">Panel de Control</a>
       <a href="{{ url_for('equipment_list') }}">Equipos</a>
 
       {% if current_user.role == 'admin' %}
         <a href="{{ url_for('loaned_equipment') }}">Equipos prestados</a>
       {% endif %}
 
-      <a href="{{ url_for('loans_list') }}">Préstamos</a>
+      {% if current_user.role != 'technician' %}
+        <a href="{{ url_for('loans_list') }}">Préstamos</a>
+      {% endif %}
 
       <a href="{{ url_for('incidents_list') }}">
         Incidencias

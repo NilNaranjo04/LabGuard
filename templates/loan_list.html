@@ -37,7 +37,7 @@
           -
         {% endif %}
       </td>
-      <td>{{ loan.status }}</td>
+      <td>{{ loan_status_label(loan.status) }}</td>
       <td>
         {% if current_user.role == 'admin' %}
           {% if loan.status == 'requested' %}
