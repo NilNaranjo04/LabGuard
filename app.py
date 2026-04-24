@@ -647,13 +647,27 @@ def register_routes(app):
     @login_required
     def change_password():
         form = ChangePasswordForm()
-        if form.validate_on_submit():
-            current_user.set_password(form.password.data.strip())
+
+        if request.method == "POST":
+            current_password = request.form.get("current_password", "").strip()
+            new_password = request.form.get("password", "").strip()
+            confirm_password = request.form.get("confirm_password", "").strip()
+
+            if not current_user.check_password(current_password):
+                flash("Error, has introducido incorrectamente la contraseña actual, vuélvela a escribir", "danger")
+                return render_template("change_password.html", form=form)
+
+            if new_password != confirm_password:
+                flash("Error, las contraseñas no coinciden", "danger")
+                return render_template("change_password.html", form=form)
+
+            current_user.set_password(new_password)
             current_user.must_change_password = False
             db.session.commit()
             audit("password_changed", f"Contraseña cambiada por {current_user.email}")
             flash("Contraseña actualizada correctamente.", "success")
             return redirect(url_for("dashboard"))
+
         return render_template("change_password.html", form=form)
 
     @app.route("/account/security-question", methods=["GET", "POST"])

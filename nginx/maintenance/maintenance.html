@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Mantenimiento</title>
+  <style>
+    body {
+      margin: 0;
+      background: #f4f6f8;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #1f2937;
+      text-align: center;
+    }
+    .box {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    .gear {
+      font-size: 56px;
+      color: #9ca3af;
+      display: inline-block;
+      animation: spin 2s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    h1 {
+      margin: 0 0 10px 0;
+      font-size: 28px;
+    }
+    p {
+      margin: 0;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="gear">⚙️</div>
+    <h1>PÁGINA EN MANTENIMIENTO</h1>
+    <p>VUELVE MÁS TARDE, GRACIAS.</p>
+  </div>
+
+<footer class="labguard-footer">
+  &copy; LabGuard 2026 - Todos los derechos reservados
+</footer>
+
+<style>
+.labguard-footer {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  text-align: center;
+  padding: 12px;
+  background: #e5e7eb;
+  color: #374151;
+  font-size: 14px;
+}
+</style>
+
+</body>
+</html>
