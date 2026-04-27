@@ -32,9 +32,6 @@
 
   <label>{{ form.password.label }}</label>
   {{ form.password() }}
-<small style="display:block;margin:6px 0 14px;color:#475569;">
-  Mínimo 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial.
-</small>
   {% for error in form.password.errors %}
     <div class="flash danger">{{ error }}</div>
   {% endfor %}

@@ -1,3 +1,15 @@
+
+import re
+
+def password_segura(password):
+    return (
+        len(password) >= 8
+        and re.search(r"[A-Z]", password)
+        and re.search(r"[a-z]", password)
+        and re.search(r"[0-9]", password)
+        and re.search(r"[^A-Za-z0-9]", password)
+    )
+
 import base64
 import io
 import os
@@ -439,6 +451,10 @@ def register_routes(app):
                 two_factor_enabled=False,
                 two_factor_secret=None,
             )
+            if not password_segura(form.password.data):
+                flash("La contraseña debe tener mínimo 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial", "danger")
+                return render_template("register.html", form=form)
+
             user.set_password(form.password.data)
             db.session.add(user)
             db.session.commit()
@@ -661,6 +677,14 @@ def register_routes(app):
                 flash("Error, las contraseñas no coinciden", "danger")
                 return render_template("change_password.html", form=form)
 
+            if not password_segura(new_password):
+                flash("La contraseña debe tener mínimo 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial", "danger")
+                return render_template("change_password.html", form=form)
+
+            if current_user.check_password(new_password):
+                flash("Error, la nueva contraseña no puede coincidir con la contraseña actual", "danger")
+                return render_template("change_password.html", form=form)
+
             current_user.set_password(new_password)
             current_user.must_change_password = False
             db.session.commit()
@@ -786,6 +810,10 @@ def register_routes(app):
                 two_factor_enabled=False,
                 two_factor_secret=None,
             )
+            if not password_segura(form.password.data):
+                flash("La contraseña debe tener mínimo 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial", "danger")
+                return render_template("register.html", form=form)
+
             user.set_password(form.password.data)
             db.session.add(user)
             db.session.commit()
