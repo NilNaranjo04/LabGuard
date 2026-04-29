@@ -1,8 +1,16 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<div class="back-box">
-  <a href="javascript:history.back()" class="back-btn">← Volver atrás</a>
+<div style="margin: 20px;">
+  <a href="javascript:history.back()" style="
+    display:inline-block;
+    background:#2563eb;
+    color:white;
+    padding:10px 16px;
+    border-radius:8px;
+    text-decoration:none;
+    font-weight:bold;
+  ">← Volver atrás</a>
 </div>
 
 <h1>Solicitar una cuenta</h1>
@@ -24,10 +32,7 @@
 
   <label>{{ form.password.label }}</label>
   {{ form.password() }}
-
-<label>Vuelve a escribir la contraseña</label>
-<input type=\"password\" name=\"confirm_password\" required>
-<small class="password-rules">
+<small style="display:block;margin:6px 0 14px;color:#475569;">
   Mínimo 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial.
 </small>
   {% for error in form.password.errors %}
@@ -39,7 +44,7 @@
 {% endblock %}
 
 
-<footer class="footer-old">
+<footer style="text-align:center;padding:14px;margin-top:40px;background:#0f172a;color:white;font-size:14px;">
   &copy; LabGuard 2026 - Todos los derechos reservados
 </footer>
 

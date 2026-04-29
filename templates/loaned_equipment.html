@@ -26,7 +26,7 @@
       <td>
         {{ format_datetime(loan.due_at) if loan.due_at else '-' }}
         {% if loan.due_at and loan.due_at < now %}
-          <br><span class="flash danger" style="display:inline-block;padding:4px 8px;">Fuera de plazo</span>
+          <br><span class="flash danger" class="inline-danger-badge">Fuera de plazo</span>
         {% endif %}
       </td>
       <td>{{ loan.status }}</td>
@@ -40,7 +40,7 @@
 {% endblock %}
 
 
-<footer style="text-align:center;padding:14px;margin-top:40px;background:#0f172a;color:white;font-size:14px;">
+<footer class="footer-old">
   &copy; LabGuard 2026 - Todos los derechos reservados
 </footer>
 

@@ -1,47 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<style>
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-top: 20px;
-}
 
-.dashboard-grid-user {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  margin-top: 20px;
-}
-
-.dashboard-card {
-  background: #f8fafc;
-  border: 1px solid #dbe3ee;
-  border-radius: 8px;
-  padding: 18px;
-}
-
-.dashboard-card h3 {
-  margin-top: 0;
-}
-
-.dashboard-number {
-  font-size: 28px;
-  margin: 8px 0 0 0;
-}
-
-.btn-dashboard {
-  display: inline-block;
-  background: #0f172a;
-  color: white;
-  padding: 9px 14px;
-  border-radius: 5px;
-  text-decoration: none;
-  margin-top: 8px;
-}
-</style>
 
 {% if current_user.role in ['admin', 'tecnico', 'técnico', 'technician'] %}
 

@@ -11,7 +11,7 @@
   <p><strong>2FA:</strong> {{ 'Activado' if current_user.two_factor_enabled else 'Desactivado' }}</p>
 </div>
 
-<p style="margin-top:20px;">
+<p class="account-actions">
   <a class="btn" href="{{ url_for('change_password') }}">Cambiar contraseña</a>
   <a class="btn btn-secondary" href="{{ url_for('set_security_question') }}">Configurar pregunta de seguridad</a>
   {% if current_user.two_factor_enabled %}
@@ -26,7 +26,7 @@
 {% endblock %}
 
 
-<footer style="text-align:center;padding:14px;margin-top:40px;background:#0f172a;color:white;font-size:14px;">
+<footer class="footer-old">
   &copy; LabGuard 2026 - Todos los derechos reservados
 </footer>
 

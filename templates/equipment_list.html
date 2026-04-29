@@ -2,14 +2,14 @@
 {% block content %}
 <h1>Equipos</h1>
 
-<div style="display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
+<div class="flex-between-end">
   {% if current_user.role in ['admin', 'technician'] %}
   <div>
     <a class="btn" href="{{ url_for('equipment_new') }}">Nuevo equipo</a>
   </div>
   {% endif %}
 
-  <form method="get" style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;">
+  <form method="get" class="flex-form">
     <div>
       <label for="category">Categoría</label>
       <select name="category" id="category">
@@ -30,7 +30,7 @@
       </select>
     </div>
 
-    <div style="display:flex;gap:8px;">
+    <div class="flex-gap">
       <button type="submit" class="btn">Filtrar</button>
       <a class="btn btn-secondary" href="{{ url_for('equipment_list') }}">Limpiar</a>
     </div>
@@ -82,7 +82,7 @@
 {% endblock %}
 
 
-<footer style="text-align:center;padding:14px;margin-top:40px;background:#0f172a;color:white;font-size:14px;">
+<footer class="footer-old">
   &copy; LabGuard 2026 - Todos los derechos reservados
 </footer>
 

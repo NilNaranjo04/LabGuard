@@ -1,28 +1,20 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<div style="margin: 20px;">
-  <a href="javascript:history.back()" style="
-    display:inline-block;
-    background:#2563eb;
-    color:white;
-    padding:10px 16px;
-    border-radius:8px;
-    text-decoration:none;
-    font-weight:bold;
-  ">← Volver atrás</a>
+<div class="back-box">
+  <a href="javascript:history.back()" class="back-btn">← Volver atrás</a>
 </div>
 
 <h1>Activar 2FA</h1>
 
 <p>Escanea este QR con Google Authenticator, Authy o Aegis.</p>
 
-<div class="card" style="max-width:420px;">
-  <img src="{{ qr_data_url }}" alt="QR 2FA" style="max-width:100%;height:auto;">
+<div class="card" class="card card-small">
+  <img src="{{ qr_data_url }}" alt="QR 2FA" class="qr-img">
   <p><strong>Clave manual:</strong> {{ secret }}</p>
 </div>
 
-<form method="post" style="margin-top:20px;">
+<form method="post" class="account-actions">
   {{ form.hidden_tag() }}
 
   <label>{{ form.token.label }}</label>
@@ -36,7 +28,7 @@
 {% endblock %}
 
 
-<footer style="text-align:center;padding:14px;margin-top:40px;background:#0f172a;color:white;font-size:14px;">
+<footer class="footer-old">
   &copy; LabGuard 2026 - Todos los derechos reservados
 </footer>
 

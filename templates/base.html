@@ -1,45 +1,12 @@
 <!doctype html>
 <html lang="es">
 <head>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LabGuard</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; background: #f4f6f8; color: #1f2937; }
-    nav { background: #0f172a; color: white; padding: 14px 24px; }
-    nav a { color: white; margin-right: 16px; text-decoration: none; position: relative; display: inline-block; }
-    .container { max-width: 1100px; margin: 24px auto; background: white; padding: 24px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
-    .flash { padding: 10px 12px; border-radius: 6px; margin-bottom: 10px; }
-    .success { background: #dcfce7; }
-    .danger { background: #fee2e2; }
-    .warning { background: #fef3c7; }
-    .info { background: #dbeafe; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border-bottom: 1px solid #e5e7eb; padding: 10px; text-align: left; vertical-align: top; }
-    input, select, textarea { width: 100%; padding: 10px; margin-top: 6px; margin-bottom: 14px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
-    button, .btn { background: #0f172a; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; }
-    .btn-secondary { background: #475569; }
-    .btn-danger { background: #b91c1c; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
-    .card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: 10px; }
-    .muted { color: #64748b; }
-    .inline { display: inline; }
-    .nav-badge {
-      position: absolute;
-      top: -8px;
-      right: -10px;
-      min-width: 18px;
-      height: 18px;
-      padding: 0 4px;
-      border-radius: 999px;
-      background: #dc2626;
-      color: white;
-      font-size: 11px;
-      line-height: 18px;
-      text-align: center;
-      font-weight: bold;
-    }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/labguard.css') }}">
+  
 </head>
 <body>
   <nav>
@@ -73,7 +40,7 @@
       {% endif %}
 
       <a href="{{ url_for('account') }}">Mi cuenta</a>
-      <a href="{{ url_for('logout') }}" style="float:right">Salir</a>
+      <a href="{{ url_for('logout') }}" class="logout-link">Salir</a>
     {% else %}
       <strong>LabGuard</strong>
     {% endif %}
@@ -98,60 +65,10 @@
   &copy; LabGuard 2026 - Todos los derechos reservados
 </footer>
 
-<style>
-body {
-  padding-bottom: 55px;
-}
-.labguard-footer {
-  position: fixed;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  text-align: center;
-  padding: 14px;
-  background: #0f172a;
-  color: white;
-  font-size: 14px;
-  z-index: 9999;
-}
-</style>
 
 
-<script id="toggle-password-eye-global">
-document.addEventListener("DOMContentLoaded", function () {
-  document.querySelectorAll('input[type="password"]').forEach(function(input) {
-    if (input.parentElement && input.parentElement.classList.contains("password-wrap")) return;
 
-    const wrap = document.createElement("div");
-    wrap.className = "password-wrap";
-    wrap.style.position = "relative";
-    wrap.style.display = "block";
-
-    input.parentNode.insertBefore(wrap, input);
-    wrap.appendChild(input);
-
-    input.style.paddingRight = "42px";
-
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.textContent = "👁";
-    btn.style.position = "absolute";
-    btn.style.right = "10px";
-    btn.style.top = "50%";
-    btn.style.transform = "translateY(-50%)";
-    btn.style.border = "none";
-    btn.style.background = "transparent";
-    btn.style.cursor = "pointer";
-    btn.style.fontSize = "16px";
-
-    btn.onclick = function () {
-      input.type = input.type === "password" ? "text" : "password";
-    };
-
-    wrap.appendChild(btn);
-  });
-});
-</script>
+<script src="{{ url_for('static', filename='js/password-eye.js') }}"></script>
 
 </body>
 </html>
